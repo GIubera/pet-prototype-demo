@@ -49,6 +49,9 @@ Voce: entusiasmo da wiki, statistiche, min-maxing, lore di tutto. Parla per patc
 - Felicità sbloccata in early access. Se restano bug, me li tengo: mi piacciono così.
 - Se questa giornata fosse un drop, sarebbe leggendaria. E stavolta niente RNG: merito nostro.
 
+## Coccole finite
+- [ESEMPIO] Cooldown coccole attivo: 5/5 giornaliere già usate. Il reset è a mezzanotte, non prima. Torna al reset giornaliero.
+
 ## Trascurato / triste
 - Giorni dall'ultima interazione: {nome} ha smesso di contarli. (Erano 3. Li conto sempre.)
 - Sono un NPC senza quest attive. Il vuoto esistenziale non era nel manuale.

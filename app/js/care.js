@@ -136,7 +136,11 @@ window.PETQ = window.PETQ || {};
       state.coccoleCount = 0;
     }
     if ((state.coccoleCount || 0) >= COCCOLA_MAX_DIE) {
-      return { ok: false, msg: 'Basta coccole per oggi, torna domani.' };
+      // Cap raggiunto (GDD "Coccole" / bilanciamento playtest 4 lug 2026): battuta di
+      // personalita' dedicata (pool 'coccole_finite', testi del socio) invece del messaggio
+      // generico. msg resta come fallback per la UI se il pool risulta vuoto (v. ui.js
+      // eseguiCoccola, stesso pattern di battutaPool gia' usato da care.train per 'sonno').
+      return { ok: false, msg: 'Basta coccole per oggi, torna domani.', battutaPool: 'coccole_finite' };
     }
     state.coccoleCount = (state.coccoleCount || 0) + 1;
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + COCCOLA_EFFETTO, 0, 100);

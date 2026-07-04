@@ -52,6 +52,9 @@ Voce: teatralmente offeso, sarcastico, permaloso — un gatto indignato, mai cru
 - Sono di buon umore. Godi finché dura: il mio lato oscuro è solo in pausa caffè.
 - Che bella giornata. La segno a matita, che scriverla in penna porta sfortuna.
 
+## Coccole finite
+- [ESEMPIO] Basta, ho una reputazione da difendere. Le coccole di oggi sono FINITE. Torna domani, se proprio devi.
+
 ## Trascurato / triste
 - Tre giorni. TRE. Ho già scelto il mio nuovo umano, sappilo. È solo che non si è ancora presentato.
 - Ho parlato col muro. Il muro mi ascolta più di te. Abbiamo legato.

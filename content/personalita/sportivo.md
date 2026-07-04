@@ -49,6 +49,9 @@ Voce: energia infinita, tutto è un allenamento o una gara, motivational coach a
 - Se la felicità fosse un campionato, oggi avrei la matematica certezza del titolo.
 - Ho esultato togliendomi la maglietta. Ammonizione giustissima, rifarei tutto.
 
+## Coccole finite
+- [ESEMPIO] Pausa recupero, coach: le coccole di oggi sono da bollettino esaurito. Poi si ricarica, promesso.
+
 ## Trascurato / triste
 - Tre giorni senza allenamento di coppia. La panchina fa male, {utente}. E io non sono da panchina.
 - Mi sono allenato da solo. Ho vinto da solo. Ho esultato da solo. Era tutto più triste, onestamente.

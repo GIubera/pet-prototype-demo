@@ -32,9 +32,25 @@ window.PETQ = window.PETQ || {};
     if (perTema && perTema[tema]) return perTema[tema];
     return { x: 6, y: 10, w: 16, h: 34 };
   }
-  // posizione del pet mentre dorme A LETTO (dentro il rettangolo letto, camera: v. rooms.js
-  // LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA, entrambe abbastanza generose da ospitare questo punto)
-  var SLEEP_BED_POS = { x: 22, y: 30 };
+  // posizione del pet mentre dorme A LETTO (FIX: prima era un punto fisso {22,30} che non
+  // teneva conto delle dimensioni reali del letto per tema e sforava sotto il bordo del
+  // letto ship - v. rooms.js LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA, che hanno x/y/w/h diversi).
+  // Ora centriamo lo sprite (PET_PX x PET_PX) nel rettangolo VERO del letto, con un piccolo
+  // offset verso il basso perche' il "materasso/giaciglio" disegnato da rooms.js occupa la
+  // meta' inferiore della capsula (la cupola/vetro sta sopra): v. labCameraLetto/
+  // shipCameraLetto, il rettangolo del cuscino+coperta parte a r.y+9/+12. Clampato dentro
+  // il rettangolo cosi' lo sprite non sporge mai fuori dai bordi del letto.
+  function sleepBedPos(tema) {
+    var r = hotzoneLetto(tema);
+    var x = Math.round(r.x + (r.w - PET_PX) / 2);
+    var y = Math.round(r.y + (r.h - PET_PX) / 2) + 4; // +4: verso il giaciglio, non la cupola
+    // clamp dentro il rettangolo letto; se il letto e' piu' piccolo del pet su un asse
+    // (min > max dopo il clamp), vince il bordo superiore/sinistro (r.x/r.y) cosi' lo sprite
+    // resta ancorato al letto invece di sforare, semplicemente "riempiendolo" per intero
+    x = Math.min(Math.max(x, r.x), Math.max(r.x, r.x + r.w - PET_PX));
+    y = Math.min(Math.max(y, r.y), Math.max(r.y, r.y + r.h - PET_PX));
+    return { x: x, y: y };
+  }
   // posizione del pet mentre dorme CROLLATO (sul pavimento, al centro come l'idle normale)
   function sleepFloorPos() {
     return { x: Math.round((ROOM_W - PET_PX) / 2), y: ROOM_H - PET_PX - 4 };
@@ -623,7 +639,7 @@ window.PETQ = window.PETQ || {};
     }
     if (currentState && currentState.sonno) {
       if (currentState.sonno.aLetto && currentStanza === 'camera') {
-        return { x: SLEEP_BED_POS.x, y: SLEEP_BED_POS.y };
+        return sleepBedPos(temaRazza(currentState.pet));
       }
       return sleepFloorPos();
     }
@@ -1171,6 +1187,13 @@ window.PETQ = window.PETQ || {};
     aggiornaHud(currentState);
     if (r.ok) {
       battutaAutomatica(); // battuta contestuale per situazione
+    } else if (r.battutaPool) {
+      // Cap coccole raggiunto (FIX battute personalita'): pesca dal pool dedicato invece
+      // del messaggio generico r.msg. Se il pool e' vuoto per quella personalita' (socio non
+      // ha ancora scritto le battute, o file non ricaricato), dialog.say ritorna '...' come
+      // placeholder universale: in quel caso ripieghiamo sul messaggio fisso di care.js.
+      var battuta = PETQ.dialog.say(currentState.pet, r.battutaPool, currentState);
+      mostraBalloon((battuta && battuta !== '...') ? battuta : r.msg);
     } else {
       mostraBalloon(r.msg);
     }

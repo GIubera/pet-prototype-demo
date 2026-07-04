@@ -13,6 +13,7 @@ window.PETQ = window.PETQ || {};
     { match: 'ha fame', chiave: 'fame' },
     { match: 'sporco', chiave: 'sporco' },
     { match: 'felice', chiave: 'felice' },
+    { match: 'coccole finite', chiave: 'coccole_finite' },
     { match: 'trascurato', chiave: 'triste' },
     { match: 'parte per la missione', chiave: 'missione_partenza' },
     { match: 'ritorno: successo', chiave: 'missione_successo' },
@@ -25,7 +26,7 @@ window.PETQ = window.PETQ || {};
     { match: 'dormito male', chiave: 'dormito_male' }
   ];
 
-  var SEZIONE_CHIAVI = ['saluto', 'fame', 'sporco', 'felice', 'triste',
+  var SEZIONE_CHIAVI = ['saluto', 'fame', 'sporco', 'felice', 'coccole_finite', 'triste',
     'missione_partenza', 'missione_successo', 'missione_fallimento', 'notifica', 'parola',
     'valigia', 'notifica_valigia', 'rientro', 'addio',
     'sonno', 'dormire', 'sveglia', 'dormito_male'];

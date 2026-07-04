@@ -48,6 +48,9 @@ Voce: dolce, premuroso, un filo appiccicoso. Si scusa anche quando non serve.
 - Ho fatto il rituale della felicità: giro del salone, capriola, sorriso alla pianta. La pianta ha gradito.
 - Il mio cuore oggi fa le fusa. Non so se posso farle, ma le fa.
 
+## Coccole finite
+- [ESEMPIO] Basta coccole per oggi, scusa... mi si scioglie il cuoricino se esagero. Domani si ricomincia?
+
 ## Trascurato / triste
 - Non ti preoccupare per me... starò qui. Da solo. Va bene così.
 - Non è che mi manchi... è che manchi. C'è differenza? Non c'è. Scusa.
