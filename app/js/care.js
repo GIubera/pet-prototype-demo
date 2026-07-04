@@ -148,19 +148,25 @@ window.PETQ = window.PETQ || {};
     return { ok: true, msg: 'Coccola fatta.' };
   }
 
-  // Durata allenamento (bilanciamento.md "Allenamento", playtest 4 lug 2026): non e' piu'
-  // istantaneo, "dura" 90 minuti di gioco. L'orologio di gioco avanza di 1.5h e il decadimento
-  // normale (fame/igiene/felicita'/energia, spawn bisogni, malus condizioni) si applica per
-  // quell'intervallo, esattamente come una piccola missione domestica — v. PETQ.pet.applyDecay
-  // (che gia' include l'avanzamento orologio, v. clock.js avanzaOrologio). Se l'avanzamento fa
-  // scattare un nuovo giorno o l'ora del crollo/sonno, applyDecay/controllaCrolloAutomatico lo
-  // gestiscono con lo stesso meccanismo del tick normale (chiamato da ui.js dopoAzione).
+  // Durata allenamento (bilanciamento.md "Durata allenamento", decisione fondatore 4 lug 2026,
+  // sessione "attivita' a tempo"): l'allenamento NON e' piu' istantaneo ne' un salto d'orologio
+  // secco. E' un ibrido tra le MISSIONI (dura, blocca le azioni, si vede un countdown) e il
+  // SONNO (la durata e' in ORE DI GIOCO che si accumulano via PETQ.pet.applyDecay, cosi' il
+  // moltiplicatore debug ×60/×600 lo accelera come tutto il resto). train() qui sotto NON
+  // applica piu' subito l'effetto: AVVIA l'attivita' (state.allenamento), l'effetto/felicita'/
+  // costo energia si applicano al COMPLETAMENTO (v. pet.js controllaAllenamentoScaduto), per
+  // coerenza con "il pet e' occupato mentre si allena" (a differenza del vecchio salto secco).
+  // trainDay si marca gia' QUI, all'AVVIO (non al completamento): impedisce di avviarne un
+  // secondo lo stesso giorno anche se il primo e' ancora in corso a cavallo di mezzanotte.
   var DURATA_ALLENAMENTO_ORE = 1.5;
 
   function train(state, statNome) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
     if (state.sonno) {
       return { ok: false, msg: (state.pet.nome || 'Il pet') + ' sta dormendo.' };
+    }
+    if (state.allenamento) {
+      return { ok: false, msg: (state.pet.nome || 'Il pet') + ' si sta gia\' allenando.' };
     }
     var oggi = oggiStr();
     if (state.trainDay === oggi) {
@@ -173,6 +179,27 @@ window.PETQ = window.PETQ || {};
       return { ok: false, msg: 'Troppo stanco per allenarsi.', battutaPool: 'sonno' };
     }
 
+    // Marcato all'AVVIO (non al completamento): un solo allenamento al giorno, niente secondo
+    // avvio finche' non cambia data, anche se il primo e' ancora "in corso".
+    state.trainDay = oggi;
+    state.allenamento = { stat: statNome, oreFatte: 0, oreTot: DURATA_ALLENAMENTO_ORE };
+
+    return {
+      ok: true,
+      msg: (state.pet.nome || 'Il pet') + ' inizia ad allenarsi.',
+      avviato: true
+    };
+  }
+
+  // Completa l'allenamento in corso: applica effetto stat (+ bonus arredi), felicita' bonus e
+  // costo energia (v. bilanciamento.md "Allenamento"/"Energia e sonno"), poi azzera
+  // state.allenamento. Va richiamata SOLO quando oreFatte >= oreTot (v. pet.js
+  // controllaAllenamentoScaduto, stesso pattern di risolviRisveglio/missions.risolvi: il
+  // "quando" lo decide il chiamante, questa funzione applica sempre se c'e' un'attivita' attiva).
+  function completaAllenamento(state) {
+    if (!state || !state.pet || !state.allenamento) return { ok: false, msg: 'Nessun allenamento in corso.' };
+
+    var statNome = state.allenamento.stat;
     var bil = bilanciamento();
     var effetto = (bil.allenamento && typeof bil.allenamento.effetto === 'number') ? bil.allenamento.effetto : 1;
     var felicitaBonus = (bil.allenamento && typeof bil.allenamento.felicita === 'number') ? bil.allenamento.felicita : 5;
@@ -182,29 +209,24 @@ window.PETQ = window.PETQ || {};
       effetto += PETQ.arredi.bonusAllenamento(state, statNome);
     }
 
-    state.pet.rpg[statNome] += effetto;
+    if (state.pet.rpg && typeof state.pet.rpg[statNome] === 'number') {
+      state.pet.rpg[statNome] += effetto;
+    }
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + felicitaBonus, 0, 100);
     state.pet.stats.energia = clamp(state.pet.stats.energia - es.costoAllenamento, 0, 100);
-    state.trainDay = oggi;
 
-    // Avanza l'orologio di gioco di 90 minuti e applica il decadimento normale per
-    // quell'intervallo (fame/igiene/felicita'/energia calano come per il tempo passato in
-    // una missione breve). applyDecay chiama gia' recomputeSalute al suo interno.
-    if (PETQ.pet.applyDecay) {
-      PETQ.pet.applyDecay(state.pet, DURATA_ALLENAMENTO_ORE, state);
-    } else {
-      PETQ.pet.recomputeSalute(state.pet, state);
-    }
+    state.allenamento = null;
+    PETQ.pet.recomputeSalute(state.pet, state);
 
-    // minutiAvanzati esposto per la UI (toast "N minuti di allenamento", GDD/bilanciamento.md
-    // "Durata allenamento"): cosi' il numero mostrato viene sempre da questa unica costante,
-    // mai duplicato a mano in ui.js.
     return {
       ok: true,
-      msg: 'Allenamento completato: +' + effetto + ' ' + statNome + '.',
-      minutiAvanzati: Math.round(DURATA_ALLENAMENTO_ORE * 60)
+      msg: 'Allenamento finito: +' + effetto + ' ' + STAT_LABEL_TRAIN[statNome] + '!',
+      stat: statNome,
+      effetto: effetto
     };
   }
+
+  var STAT_LABEL_TRAIN = { forza: 'Forza', intelligenza: 'Intelligenza', velocita: 'Velocità', carisma: 'Carisma' };
 
   function teachWord(state, parola) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
@@ -304,6 +326,7 @@ window.PETQ = window.PETQ || {};
     cleanPoop: cleanPoop,
     coccola: coccola,
     train: train,
+    completaAllenamento: completaAllenamento,
     teachWord: teachWord,
     dailyLogin: dailyLogin,
     cura: cura,

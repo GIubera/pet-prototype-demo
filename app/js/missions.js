@@ -333,6 +333,9 @@ window.PETQ = window.PETQ || {};
     if (state.sonno) {
       return { ok: false, msg: (state.pet && state.pet.nome ? state.pet.nome : 'Il pet') + ' sta dormendo.' };
     }
+    if (state.allenamento) {
+      return { ok: false, msg: (state.pet && state.pet.nome ? state.pet.nome : 'Il pet') + ' si sta allenando.' };
+    }
     if (PETQ.pet && PETQ.pet.energiaSottoSoglia && PETQ.pet.energiaSottoSoglia(state.pet)) {
       return { ok: false, msg: 'Troppo stanco per partire in missione.', battutaPool: 'sonno' };
     }

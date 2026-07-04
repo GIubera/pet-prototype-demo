@@ -511,6 +511,20 @@ button {
   pointer-events: none;
 }
 
+/* Card "allenamento in corso" (bilanciamento.md "Durata allenamento", attivita' a tempo):
+   stessa forma delle card allenamento ma non disabilitata/attenuata come petq-train-card-usata
+   — e' informativa, mostra il countdown, non e' un pulsante. */
+.petq-train-card-corso {
+  cursor: default;
+  flex: none;
+  width: 100%;
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #3ee6d0;
+  background: #142321;
+}
+
 /* ---------- Drag ghost, shake, toast ---------- */
 
 .petq-ghost {

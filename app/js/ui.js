@@ -181,6 +181,7 @@ window.PETQ = window.PETQ || {};
     if (state) {
       currentState = state;
       controllaSonnoScaduto();
+      controllaAllenamentoScaduto();
       // apertura app con missione già finita: risolvi e mostra subito l'esito
       if (controllaMissioneScaduta()) return;
       mostraCasa(state);
@@ -194,6 +195,7 @@ window.PETQ = window.PETQ || {};
     currentState = state;
     controllaAnimScaduta();
     controllaSonnoScaduto();
+    controllaAllenamentoScaduto();
     if (!animazioneInCorso && controllaMissioneScaduta()) return;
     if (document.getElementById('petq-casa')) {
       aggiornaHud(state);
@@ -238,6 +240,25 @@ window.PETQ = window.PETQ || {};
       renderAzioni();
     }
     return null;
+  }
+
+  // Controlla l'allenamento a tempo (bilanciamento.md "Durata allenamento"): quando
+  // oreFatte >= oreTot, applica l'effetto e mostra il toast/battuta di fine — stesso pattern
+  // idempotente di controllaMissioneScaduta/controllaSonnoScaduto sopra, chiamata dagli stessi
+  // punti (boot/render/idle).
+  function controllaAllenamentoScaduto() {
+    if (!currentState || !currentState.allenamento || !PETQ.pet || !PETQ.pet.controllaAllenamentoScaduto) return null;
+    var esito = PETQ.pet.controllaAllenamentoScaduto(currentState);
+    if (!esito) return null;
+    PETQ.save.save(currentState);
+    disegnaStanzaEPet(currentState);
+    aggiornaHud(currentState);
+    renderAzioni();
+    if (esito.ok) {
+      mostraToast(esito.msg);
+      mostraBalloon(PETQ.dialog.say(currentState.pet, 'felice', currentState));
+    }
+    return esito;
   }
 
   // ==================== INTRO ====================
@@ -638,6 +659,17 @@ window.PETQ = window.PETQ || {};
 
   // ---------- disegno stanza + pet + effetti ----------
 
+  // prop dell'allenamento IN CORSO (state.allenamento.stat -> id prop), per il bounce/icona
+  // sul canvas per tutta la durata dell'attivita' (non solo durante i 1.2s dell'animazione
+  // locale di avvio, v. avviaAllenamento/PROPS_ALLENAMENTO).
+  function propAllenamentoAttivo(state) {
+    if (!state || !state.allenamento) return null;
+    for (var i = 0; i < PROPS_ALLENAMENTO.length; i++) {
+      if (PROPS_ALLENAMENTO[i].stat === state.allenamento.stat) return PROPS_ALLENAMENTO[i].id;
+    }
+    return null;
+  }
+
   function posizionePet() {
     if (effetto && effetto.tipo === 'wash') {
       return { x: WASH_POS.x, y: WASH_POS.y };
@@ -649,7 +681,8 @@ window.PETQ = window.PETQ || {};
       return sleepFloorPos();
     }
     var y = ROOM_H - PET_PX - 4 + (idleFrame === 1 ? 1 : 0);
-    if (effetto && effetto.tipo === 'train' && idleFrame === 1) y -= 3; // bounce da allenamento
+    var inTrain = (effetto && effetto.tipo === 'train') || (currentState && currentState.allenamento);
+    if (inTrain && idleFrame === 1) y -= 3; // bounce da allenamento
     return { x: Math.round((ROOM_W - PET_PX) / 2), y: y };
   }
 
@@ -699,11 +732,16 @@ window.PETQ = window.PETQ || {};
 
       g.drawImage(petCanvas, pos.x, pos.y);
 
-      if (effetto && effetto.tipo === 'train') {
+      // Prop dell'allenamento: durante l'animazione locale di avvio (effetto.tipo==='train')
+      // oppure per TUTTA la durata dell'attivita' (state.allenamento attivo, v.
+      // propAllenamentoAttivo) cosi' il pet resta visibilmente "al lavoro" col suo attrezzo
+      // finche' il countdown non arriva a zero (GDD: riusa l'animazione/prop esistente).
+      var propTrain = (effetto && effetto.tipo === 'train') ? effetto.prop : propAllenamentoAttivo(state);
+      if (propTrain) {
         var propCanvas = document.createElement('canvas');
         propCanvas.width = 12;
         propCanvas.height = 12;
-        disegnaProp(propCanvas, effetto.prop);
+        disegnaProp(propCanvas, propTrain);
         g.drawImage(propCanvas, Math.min(pos.x + PET_PX - 2, ROOM_W - 12), pos.y + PET_PX - 13);
       }
 
@@ -713,6 +751,7 @@ window.PETQ = window.PETQ || {};
     if (effetto && effetto.tipo === 'puff') disegnaPuff(g, effetto);
 
     aggiornaIndicatoreMissione(state);
+    aggiornaIndicatoreAllenamento(state);
   }
 
   // placeholder arredi piazzati: puntino luminoso sugli slot occupati della stanza corrente.
@@ -729,6 +768,22 @@ window.PETQ = window.PETQ || {};
       g.fillStyle = (idleFrame === 1) ? '#bff5ec' : '#7fefe0';
       g.fillRect(s[0], s[1] - 1, 2, 1);
     }
+  }
+
+  // Aggiorna il countdown testuale dell'allenamento in corso (salone) senza rifare tutto
+  // renderAzioni(): stesso pattern "leggero" di aggiornaIndicatoreMissione sotto, chiamato da
+  // disegnaStanzaEPet ad ogni tick idle cosi' i minuti scendono anche senza toccare nulla.
+  function aggiornaIndicatoreAllenamento(state) {
+    if (!state || !state.allenamento || currentStanza !== 'salone') return;
+    var minuti = minutiAllenamentoRimasti(state);
+    var hint = document.getElementById('petq-allenamento-hint');
+    if (hint) {
+      var nome = state.pet.nome || 'il pet';
+      var statLabel = STAT_LABEL[state.allenamento.stat] || state.allenamento.stat;
+      hint.textContent = nome + ' si allena (' + statLabel + '). Pronto tra ' + minuti + 'm.';
+    }
+    var cd = document.getElementById('petq-allenamento-countdown');
+    if (cd) cd.textContent = 'Si allena, pronto tra ' + minuti + 'm';
   }
 
   function aggiornaIndicatoreMissione(state) {
@@ -970,6 +1025,7 @@ window.PETQ = window.PETQ || {};
       // controlliamo anche qui così il ritorno è puntuale
       if (!animazioneInCorso && controllaMissioneScaduta()) return;
       if (!animazioneInCorso) controllaSonnoScaduto();
+      if (!animazioneInCorso) controllaAllenamentoScaduto();
       disegnaStanzaEPet(currentState);
     }, IDLE_MS);
   }
@@ -1120,7 +1176,7 @@ window.PETQ = window.PETQ || {};
       var dy = e.clientY - canvasPointer.startY;
       var dist = Math.sqrt(dx * dx + dy * dy);
 
-      var puoTrascinare = canvasPointer.target === 'pet' && !currentState.sonno &&
+      var puoTrascinare = canvasPointer.target === 'pet' && !currentState.sonno && !currentState.allenamento &&
         (currentStanza === 'bagno' || currentStanza === 'camera');
       if (!canvasPointer.dragging && puoTrascinare && dist > 10) {
         canvasPointer.dragging = true;
@@ -1187,6 +1243,10 @@ window.PETQ = window.PETQ || {};
   // ---------- azioni di gioco (flussi touch) ----------
 
   function eseguiCoccola() {
+    if (currentState.allenamento) {
+      mostraToast((currentState.pet.nome || 'Il pet') + ' si sta allenando.');
+      return;
+    }
     var r = PETQ.care.coccola(currentState);
     PETQ.save.save(currentState);
     aggiornaHud(currentState);
@@ -1249,7 +1309,7 @@ window.PETQ = window.PETQ || {};
   // La modalita' (riposino/notturno) la decide PETQ.pet.avviaSonno in base all'orologio DI
   // GIOCO corrente (PETQ.clock.oraGioco): il pet PUO' SEMPRE essere messo a dormire.
   function provaAndareALetto() {
-    if (!currentState || !currentState.pet || currentState.sonno || currentState.missione) return;
+    if (!currentState || !currentState.pet || currentState.sonno || currentState.missione || currentState.allenamento) return;
     PETQ.pet.avviaSonno(currentState, true);
     PETQ.save.save(currentState);
     disegnaStanzaEPet(currentState);
@@ -1295,6 +1355,11 @@ window.PETQ = window.PETQ || {};
       mostraToast((currentState.pet.nome || 'Il pet') + ' è in missione: la pappa può aspettare.');
       return;
     }
+    if (currentState.allenamento) {
+      shakeCard(cardEl);
+      mostraToast((currentState.pet.nome || 'Il pet') + ' si sta allenando.');
+      return;
+    }
     var r = PETQ.care.feed(currentState, cibo);
     if (!r.ok) {
       shakeCard(cardEl);
@@ -1322,27 +1387,38 @@ window.PETQ = window.PETQ || {};
     }
   }
 
+  // Allenamento a tempo (bilanciamento.md "Durata allenamento", decisione fondatore: attivita'
+  // a tempo come una missione, non piu' un salto d'orologio istantaneo). Tap sulla card -> una
+  // breve animazione locale di "avvio" (stesso feedback immediato di prima), poi PETQ.care.train
+  // AVVIA l'attivita' (state.allenamento): da qui in poi e' renderAzioniSalone/disegnaStanzaEPet
+  // (guidati da state.allenamento, non da `effetto`/animazioneInCorso locali) a mostrare lo
+  // stato "in corso" con countdown finche' non arriva il completamento (v.
+  // controllaAllenamentoScaduto), esattamente come le missioni mostrano "torna tra X".
   function avviaAllenamento(prop, cardEl) {
     if (animazioneInCorso) return;
     if (currentState.trainDay === oggiStr()) {
       mostraToast('Allenamento già fatto oggi.');
       return;
     }
+    if (currentState.allenamento) {
+      mostraToast((currentState.pet.nome || 'Il pet') + ' si sta già allenando.');
+      return;
+    }
     animazioneInCorso = true;
     effetto = { tipo: 'train', prop: prop.id };
     disegnaStanzaEPet(currentState);
 
-    animaTimed(2500, function () {
+    animaTimed(1200, function () {
       effetto = null;
       animazioneInCorso = false;
       var r = PETQ.care.train(currentState, prop.stat);
-      dopoAzione(r);
-      // Allenamento non istantaneo (bilanciamento.md "Durata allenamento"): l'orologio salta
-      // di ~90 minuti, quindi lo segnaliamo con un toast esplicito oltre al fumetto di
-      // dopoAzione, cosi' l'effetto e' leggibile e non sembra un'azione istantanea.
-      if (r && r.ok && r.minutiAvanzati) {
-        mostraToast(r.minutiAvanzati + ' minuti di allenamento');
+      if (!r.ok) {
+        mostraToast(r.msg);
+        disegnaStanzaEPet(currentState);
+        renderAzioni();
+        return;
       }
+      dopoAzione(r);
     });
   }
 
@@ -1397,6 +1473,8 @@ window.PETQ = window.PETQ || {};
       container.appendChild(costruisciTastoSveglia(nome));
     } else if (currentState.missione) {
       container.appendChild(el('p', 'petq-hint', nome + ' è in missione: il letto aspetta il suo ritorno.'));
+    } else if (currentState.allenamento) {
+      container.appendChild(el('p', 'petq-hint', nome + ' si sta allenando: il letto aspetta che finisca.'));
     } else {
       container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire: riposino di giorno, nanna vera dalle 21:00.'));
     }
@@ -1585,6 +1663,8 @@ window.PETQ = window.PETQ || {};
     var nome = currentState.pet.nome || 'il pet';
     if (currentState.missione) {
       container.appendChild(el('p', 'petq-hint', nome + ' è in missione: niente bagnetto finché non torna.'));
+    } else if (currentState.allenamento) {
+      container.appendChild(el('p', 'petq-hint', nome + ' si sta allenando: niente bagnetto finché non finisce.'));
     } else {
       container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nella vasca per lavarlo.'));
     }
@@ -1661,10 +1741,70 @@ window.PETQ = window.PETQ || {};
 
   // --- salone: card allenamento + insegna parola ---
 
+  // Minuti di gioco rimanenti dell'allenamento in corso (bilanciamento.md "Durata
+  // allenamento"): (oreTot - oreFatte) x 60, mai negativo. Usata dalla card "in corso" sotto
+  // e potenzialmente da un tick di aggiornamento countdown (v. aggiornaIndicatoreMissione per
+  // il pattern equivalente delle missioni).
+  function minutiAllenamentoRimasti(state) {
+    var a = state && state.allenamento;
+    if (!a) return 0;
+    var oreRimaste = Math.max(0, (a.oreTot || 0) - (a.oreFatte || 0));
+    return Math.max(1, Math.round(oreRimaste * 60));
+  }
+
   function renderAzioniSalone(container) {
     var oggi = oggiStr();
     var nome = currentState.pet.nome || 'il pet';
     var inMissione = !!currentState.missione;
+    var inAllenamento = !!currentState.allenamento;
+
+    // Allenamento IN CORSO (bilanciamento.md "Durata allenamento", decisione fondatore:
+    // attivita' a tempo come una missione): al posto delle 4 card, la card unica di stato con
+    // countdown, stesso pattern della card missione-in-corso (v. costruisciCardMissioneInCorso).
+    if (inAllenamento) {
+      var statLabel = STAT_LABEL[currentState.allenamento.stat] || currentState.allenamento.stat;
+      var hintAllenamento = el('p', 'petq-hint');
+      hintAllenamento.id = 'petq-allenamento-hint';
+      hintAllenamento.textContent = nome + ' si allena (' + statLabel + '). Pronto tra ' + minutiAllenamentoRimasti(currentState) + 'm.';
+      container.appendChild(hintAllenamento);
+
+      var cardCorso = el('div', 'petq-train-card petq-train-card-corso');
+      var iconaCorso = document.createElement('canvas');
+      iconaCorso.width = 12; iconaCorso.height = 12;
+      iconaCorso.className = 'petq-train-icon';
+      disegnaProp(iconaCorso, propAllenamentoAttivo(currentState) || 'pesi');
+      cardCorso.appendChild(iconaCorso);
+      var labelCorso = el('div', 'petq-train-label', 'Si allena, pronto tra ' + minutiAllenamentoRimasti(currentState) + 'm');
+      labelCorso.id = 'petq-allenamento-countdown';
+      cardCorso.appendChild(labelCorso);
+      container.appendChild(cardCorso);
+
+      var cardsDisabled = el('div', 'petq-train-cards');
+      for (var d = 0; d < PROPS_ALLENAMENTO.length; d++) {
+        var cardD = el('div', 'petq-train-card petq-train-card-usata');
+        cardD.title = nome + ' si sta allenando';
+        var iconaD = document.createElement('canvas');
+        iconaD.width = 12; iconaD.height = 12;
+        iconaD.className = 'petq-train-icon';
+        disegnaProp(iconaD, PROPS_ALLENAMENTO[d].id);
+        cardD.appendChild(iconaD);
+        cardD.appendChild(el('div', 'petq-train-label', PROPS_ALLENAMENTO[d].label));
+        cardsDisabled.appendChild(cardD);
+      }
+      container.appendChild(cardsDisabled);
+
+      // collezione resta disponibile anche ad allenamento in corso (azione "passiva", niente
+      // interazione col pet)
+      var collBtnCorso = el('button', 'petq-btn', collezioneAperta ? 'Chiudi collezione' : 'Collezione');
+      collBtnCorso.addEventListener('click', function () {
+        collezioneAperta = !collezioneAperta;
+        renderAzioni();
+      });
+      container.appendChild(collBtnCorso);
+      if (collezioneAperta) container.appendChild(costruisciCollezione());
+      return;
+    }
+
     var giaAllenato = currentState.trainDay === oggi;
     var cardsDisabilitate = giaAllenato || inMissione;
 
@@ -1689,7 +1829,7 @@ window.PETQ = window.PETQ || {};
         card.appendChild(el('div', 'petq-train-val', testoStat(prop.stat)));
 
         card.addEventListener('click', function () {
-          if (currentState.trainDay === oggiStr() || currentState.missione) return;
+          if (currentState.trainDay === oggiStr() || currentState.missione || currentState.allenamento) return;
           avviaAllenamento(prop, card);
         });
         cards.appendChild(card);
@@ -2273,6 +2413,10 @@ window.PETQ = window.PETQ || {};
 
   function eseguiPartenza(scheda) {
     if (currentState.missione) return;
+    if (currentState.allenamento) {
+      mostraToast((currentState.pet.nome || 'Il pet') + ' si sta allenando.');
+      return;
+    }
     var r = PETQ.missions.avvia(currentState, scheda.id);
     if (!r.ok) {
       mostraToast(r.msg);
@@ -2552,6 +2696,21 @@ window.PETQ = window.PETQ || {};
       }
     });
     panel.appendChild(fineMissBtn);
+
+    // Debug "Fine allenamento subito" (bilanciamento.md "Durata allenamento", attivita' a
+    // tempo): completa IMMEDIATAMENTE l'allenamento in corso, stesso pattern di "Fine missione
+    // subito" sopra (forza oreFatte al massimo e lascia che il controllo normale la risolva).
+    var fineAllenBtn = el('button', 'petq-btn petq-btn-mini', 'Fine allenamento subito');
+    fineAllenBtn.addEventListener('click', function () {
+      if (currentState && currentState.allenamento) {
+        currentState.allenamento.oreFatte = currentState.allenamento.oreTot;
+        PETQ.save.save(currentState);
+        controllaAllenamentoScaduto();
+      } else {
+        mostraToast('Nessun allenamento in corso.');
+      }
+    });
+    panel.appendChild(fineAllenBtn);
 
     // Debug "Nuovo giorno" (fix playtest, limite 1 missione/giorno): azzera tutti i contatori
     // giornalieri e fa scattare il dailyLogin, cosi' si puo' testare il reset senza aspettare

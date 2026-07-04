@@ -121,7 +121,7 @@ Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da r
 |---|---|
 | Sessioni al giorno | 1 |
 | Effetto | +1 alla stat scelta, +5 Felicità |
-| Durata allenamento (avanza l'orologio di gioco) | 90 minuti di gioco (decisione playtest 4 lug 2026; l'allenamento non è più istantaneo, "dura 1-2 ore" — proposta 90 min, da tarare) |
+| Durata allenamento | 90 minuti di GIOCO come ATTIVITÀ A TEMPO (decisione fondatore 4 lug 2026): non è un'azione istantanea né un salto d'orologio secco — il pet si allena con un countdown, è "occupato" (niente coccole/pappa/altra missione finché non finisce), esattamente come una missione ma a casa. La stat/felicità/energia si applicano SOLO al completamento. Proposta 90 min, da tarare |
 | Insegna parola | max 1 al giorno, +5 Felicità |
 | Frequenza uso parola imparata nelle battute contestuali | 30% (alzata da 20% — il fondatore non la vedeva mai) |
 

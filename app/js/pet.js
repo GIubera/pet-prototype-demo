@@ -168,6 +168,17 @@ window.PETQ = window.PETQ || {};
       return;
     }
 
+    // Allenamento (bilanciamento.md "Durata allenamento", decisione fondatore: attivita' a
+    // tempo, non piu' salto istantaneo): a differenza del sonno, il pet e' SVEGLIO mentre si
+    // allena, quindi il decadimento normale delle stat CONTINUA sotto (niente return qui) —
+    // accumuliamo solo oreFatte in ore di GIOCO, stesso pattern di state.sonno.oreDormite,
+    // cosi' anche l'allenamento e' accelerato dal debug ×60/×600. Il completamento (oreFatte
+    // >= oreTot) e' controllato da controllaAllenamentoScaduto, chiamato dal tick/boot come
+    // controllaSveglia/controllaMissioneScaduta.
+    if (state && state.allenamento) {
+      state.allenamento.oreFatte = (state.allenamento.oreFatte || 0) + gameHours;
+    }
+
     var bil = bilanciamento();
     var dec = bil.decadimento || { fame: 6, igiene: 8, felicita: 2 };
     var soglie = bil.soglie || { critica: 25, magro: 30, sporco: 30, malusSalute: 40 };
@@ -378,7 +389,7 @@ window.PETQ = window.PETQ || {};
   // Va richiamata dal tick di gioco (pattern controllaMissioneScaduta in ui.js: chiamata
   // periodica, idempotente perche' avviaSonno non fa nulla se state.sonno e' gia' impostato).
   function controllaCrolloAutomatico(state) {
-    if (!state || state.sonno || state.missione) return false;
+    if (!state || state.sonno || state.missione || state.allenamento) return false;
     var es = bilEnergiaSonno();
     var og = PETQ.clock ? PETQ.clock.oraGioco(state) : { ore: 0 };
     if (og.ore >= es.oraCrollo) {
@@ -479,6 +490,29 @@ window.PETQ = window.PETQ || {};
     return risolviRisveglio(state, durataMax, false);
   }
 
+  // ==================== Allenamento a tempo (bilanciamento.md "Allenamento") ====================
+  // state.allenamento = null | { stat, oreFatte, oreTot }. Avviato da PETQ.care.train (che
+  // NON applica piu' subito l'effetto), avanzato in ore di GIOCO da applyDecay sopra (stesso
+  // pattern di state.sonno.oreDormite). Quando oreFatte >= oreTot il completamento applica
+  // effetto/felicita'/energia UNA SOLA VOLTA tramite PETQ.care.completaAllenamento e azzera lo
+  // stato — v. controllaAllenamentoScaduto, richiamata dal tick/boot esattamente come
+  // controllaSveglia/controllaMissioneScaduta (v. ui.js).
+  //
+  // Nota di design (documentata qui come richiesto): il crollo automatico delle 23 NON
+  // interrompe un allenamento in corso. Il pet si sta allenando da SVEGLIO (non e' a dormire),
+  // quindi a differenza della missione (che e' fuori casa) lasciamo che l'allenamento finisca
+  // per conto suo; controllaCrolloAutomatico sopra gia' si astiene se c'e' una missione, e qui
+  // estendiamo la stessa astensione al caso allenamento cosi' il pet non "salta" a dormire a
+  // meta' sessione — finita l'attivita' (anche oltre le 23, il gioco di gioco prosegue) il
+  // primo tick libero lo mettera' comunque a nanna al prossimo controllo se e' ancora tardi.
+  function controllaAllenamentoScaduto(state) {
+    if (!state || !state.allenamento) return null;
+    var a = state.allenamento;
+    if ((a.oreFatte || 0) < a.oreTot) return null;
+    if (!PETQ.care || typeof PETQ.care.completaAllenamento !== 'function') return null;
+    return PETQ.care.completaAllenamento(state);
+  }
+
   window.PETQ.pet = {
     generate: generate,
     applyDecay: applyDecay,
@@ -494,6 +528,7 @@ window.PETQ = window.PETQ || {};
     svegliaManuale: svegliaManuale,
     puoSvegliare: puoSvegliare,
     debugSaltaAlMattino: debugSaltaAlMattino,
+    controllaAllenamentoScaduto: controllaAllenamentoScaduto,
     _risolviRisveglio: risolviRisveglio
   };
 
