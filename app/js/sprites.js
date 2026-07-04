@@ -286,6 +286,45 @@ window.PETQ = window.PETQ || {};
     }
   }
 
+  // Resa "sdraiato" (dorme, GDD "Energia e sonno" -> Zzz animati): ruota lo sprite esistente
+  // di 90 gradi cosi' il pet appare disteso in orizzontale invece che in piedi, senza bisogno
+  // di ridisegnare ogni creatura in una posa dedicata. Il canvas resta quadrato (stesso
+  // PET_PX x PET_PX usato per lo sprite in piedi, v. ui.js PET_PX) cosi' il chiamante non deve
+  // toccare hit-test/posizionamento: la rotazione avviene internamente attorno al centro.
+  // "lato": 1 = testa a sinistra (default, per il letto), -1 = testa a destra (specchiato,
+  // utile per varianti di posa sul pavimento).
+  function drawSdraiato(canvas, petLike, opts) {
+    if (!canvas || !petLike) return;
+    opts = opts || {};
+    var ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    var res = resolvePet(petLike);
+    var scale = canvas.width / SIZE;
+    var cx = canvas.width / 2, cy = canvas.height / 2;
+    var lato = opts.lato === -1 ? -1 : 1;
+
+    ctx.save();
+    // ruota la creatura di un quarto di giro: "in piedi" (verticale) -> "disteso" (orizzontale).
+    // Verso di rotazione scelto cosi' la testa (riga 0 del frame) finisce a sinistra quando
+    // lato=1: si legge subito come "disteso sul fianco", non "in piedi ruotato a caso".
+    ctx.translate(cx, cy);
+    ctx.rotate(lato === 1 ? -Math.PI / 2 : Math.PI / 2);
+    ctx.translate(-cx, -cy);
+    paintFrame(ctx, res.frame, res.palette, scale, 0, 0);
+    if (petLike.sporco) {
+      drawDirtOverlay(ctx, res.frame, scale, 0, 0);
+      drawFlies(ctx, res.frame, scale, opts.frame === 1 ? 1 : 0, 0, 0);
+    }
+    ctx.restore();
+
+    // occhi chiusi + Zzz sopra, NON ruotati (restano leggibili in orizzontale): drawSonno usa
+    // gia' coordinate relative al terzo superiore/lato del canvas, valide anche qui perche'
+    // il canvas resta PET_PX x PET_PX quadrato.
+    drawSonno(ctx, opts.frame);
+  }
+
   // ===== Icone cibo 12x12 (outline scuro + fill, "." trasparente) =====
   var ICON_SIZE = 12;
 
@@ -880,6 +919,7 @@ window.PETQ = window.PETQ || {};
 
   window.PETQ.sprites = {
     draw: draw,
+    drawSdraiato: drawSdraiato,
     drawFood: drawFood,
     drawProp: drawProp,
     drawFoam: drawFoam,

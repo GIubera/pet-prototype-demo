@@ -129,16 +129,30 @@ Voce: entusiasmo da wiki, statistiche, min-maxing, lore di tutto. Parla per patc
 - Trasformazione completata senza perdita di dati. I ricordi ci sono tutti. SOPRATTUTTO quelli imbarazzanti tuoi.
 
 ## Ha sonno (sotto soglia energia o prima delle 21)
-- [ESEMPIO] Energia sotto soglia critica, tipo barra rossa lampeggiante. Serve rigenerazione, cioè un letto.
+- Energia sotto soglia critica, tipo barra rossa lampeggiante. Serve rigenerazione, cioè un letto.
+- Missione rifiutata: mana insufficiente. Il letto è l'unica pozione che conosco senza effetti collaterali.
+- Sto laggando nella vita reale. Cammino a 12 fotogrammi al secondo. Non è bello da vedere.
+- Richiesta di sospensione attività: approvata da me, in attesa della tua firma. La firma è portarmi a letto.
 
 ## Va a dormire (dalle 21, portato a letto)
-- [ESEMPIO] Salvataggio in corso, non spegnere la console. Ci vediamo dopo il caricamento.
+- Salvataggio in corso, non spegnere la console. Ci vediamo dopo il caricamento.
+- Modalità notte attivata. Sogni in coda: tre. Spoiler: in uno ci sei tu che porti snack.
+- Spegnimento programmato. Ultimo log della giornata: "giornata accettabile, l'umano si è visto". Buonanotte.
+- Vado in standby, non in shutdown. La differenza? In standby ti sento se porti biscotti.
 
 ## Sveglia (risveglio dopo il sonno)
-- [ESEMPIO] Respawn completato, energia al massimo. Pronto per il prossimo dungeon.
+- Respawn completato, energia al massimo. Pronto per il prossimo dungeon.
+- Buongiorno! Riavvio completato in 0,3 secondi. Il record di ieri era 0,4: si migliora sempre.
+- Sistema operativo: sveglio. Aggiornamenti installati nella notte: fame 2.0.
+- Online! Log della notte: 8 ore, zero interruzioni, un sogno con trama debole ma buon finale.
+- Buongiorno! Energia al 100%, sarcasmo al 100%, fame al 146%. Un valore è fuori scala, indovina quale.
 
 ## Dormito male (crollato, non a letto)
-- [ESEMPIO] Ho fatto respawn sul pavimento invece che al checkpoint. Bug di design, non colpa mia.
+- Ho fatto respawn sul pavimento invece che al checkpoint. Bug di design, non colpa mia.
+- Ho dormito per terra. Comfort: 0/10. Lore del pavimento: interessante. Non chiedermi il seguito.
+- Sveglia anticipata rilevata. Sei ufficialmente il lag della mia vita, {utente}.
+- Ho dormito in modalità hardcore: sul pavimento, senza checkpoint. Non la consiglio nemmeno ai completisti.
+- Nottataccia. Il pavimento come materasso è una feature che nessuno aveva richiesto. Rimuovila.
 
 ## Usa una parola imparata
 - {parola}: aggiunta al mio database personale. Sinergizza bene con tutto.

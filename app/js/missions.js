@@ -19,6 +19,11 @@ window.PETQ = window.PETQ || {};
 
   var NOME_ALLENATORE = 'Il Topo (allenatore)';
 
+  // Cooldown missioni (GDD "Missioni" / bilanciamento.md "Cooldown missioni", playtest 4 lug
+  // 2026): una missione completata esce dalla rosa per COOLDOWN_GIORNI giorni di gioco. Il
+  // tutorial m0 e' escluso dal meccanismo (fuoriRosa, non passa mai da qui).
+  var COOLDOWN_GIORNI = 3;
+
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
   }
@@ -28,6 +33,14 @@ window.PETQ = window.PETQ || {};
     var mese = String(d.getMonth() + 1).padStart(2, '0');
     var giorno = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + mese + '-' + giorno;
+  }
+
+  // differenza in giorni di calendario tra due stringhe 'YYYY-MM-DD' (b - a). Usa mezzogiorno
+  // UTC per evitare sfasamenti da cambio ora legale sulle differenze di data locale.
+  function diffGiorniStr(a, b) {
+    var da = new Date(a + 'T12:00:00Z').getTime();
+    var db = new Date(b + 'T12:00:00Z').getTime();
+    return Math.round((db - da) / 86400000);
   }
 
   // Guardia difensiva: garantisce i campi di stato usati da questo modulo, utile se chiamato
@@ -42,6 +55,12 @@ window.PETQ = window.PETQ || {};
     if (typeof state.missione === 'undefined') state.missione = null;
     if (typeof state.coins !== 'number') state.coins = 0;
     state.tutorialFatto = !!state.tutorialFatto;
+    // Cooldown missioni: mappa {id: 'YYYY-MM-DD' ultima esecuzione}, settata alla RISOLUZIONE
+    // (v. risolvi). Migrazione: i salvataggi vecchi non ce l'hanno, si parte da mappa vuota
+    // (nessuna missione in cooldown finche' non se ne completa una nuova).
+    if (!state.missioniFatte || typeof state.missioniFatte !== 'object' || Array.isArray(state.missioniFatte)) {
+      state.missioniFatte = {};
+    }
   }
 
   function dataMissioni() {
@@ -83,13 +102,62 @@ window.PETQ = window.PETQ || {};
     };
   }
 
+  var DIM_ROSA = 4;
+
+  // Applica il cooldown missioni (bilanciamento.md "Cooldown missioni", playtest 4 lug 2026):
+  // esclude dal pool le schede completate da MENO di COOLDOWN_GIORNI giorni di gioco. Se il
+  // pool disponibile scende sotto DIM_ROSA, riammette le completate PIU' VECCHIE (ultima
+  // esecuzione piu' lontana nel tempo) fino a riempirlo di nuovo: la rosa non e' mai vuota,
+  // ne' sotto la sua dimensione naturale se ci sono abbastanza schede totali.
+  function applicaCooldown(candidate, state) {
+    var oggi = oggiStr();
+    var fatte = (state && state.missioniFatte && typeof state.missioniFatte === 'object') ? state.missioniFatte : {};
+
+    var disponibili = [];
+    var inCooldown = []; // {scheda, dataUltima}
+    for (var i = 0; i < candidate.length; i++) {
+      var m = candidate[i];
+      var dataUltima = fatte[m.id];
+      if (!dataUltima) {
+        disponibili.push(m);
+        continue;
+      }
+      var giorniPassati = diffGiorniStr(dataUltima, oggi);
+      if (giorniPassati >= COOLDOWN_GIORNI) {
+        disponibili.push(m);
+      } else {
+        inCooldown.push({ scheda: m, dataUltima: dataUltima });
+      }
+    }
+
+    if (disponibili.length >= DIM_ROSA || inCooldown.length === 0) {
+      return disponibili;
+    }
+
+    // riammette le piu' vecchie (dataUltima piu' indietro nel tempo = numero di giorni
+    // passati piu' alto) finche' non si raggiunge DIM_ROSA o si esauriscono i candidati
+    inCooldown.sort(function (a, b) {
+      return diffGiorniStr(a.dataUltima, oggi) < diffGiorniStr(b.dataUltima, oggi) ? 1 : -1;
+    });
+    var mancano = DIM_ROSA - disponibili.length;
+    for (var j = 0; j < inCooldown.length && j < mancano; j++) {
+      disponibili.push(inCooldown[j].scheda);
+    }
+
+    return disponibili;
+  }
+
   // Estrae 4 schede su 8 (M1-M8, mai M0) con seed = hash della data odierna, garantendo
   // copertura di almeno 3 stat diverse tra le 4 (forza/intelligenza/velocita/carisma).
   // Deterministico: stessa data -> stesso set, sempre (usato anche per verificare la stabilita'
   // nei test). Se la copertura minima non e' raggiungibile per mancanza di schede valide,
   // restituisce comunque le 4 estratte con un console.warn (non blocca il boot).
+  // Prima di estrarre, applica il cooldown missioni (v. applicaCooldown): le completate da
+  // meno di 3 giorni di gioco sono escluse, salvo riammissione delle piu' vecchie se il pool
+  // scende sotto la dimensione della rosa.
   function rosaDelGiorno(state) {
-    var candidate = dataMissioni().filter(function (m) { return !m.fuoriRosa && m.id !== 'm0'; });
+    var tutte = dataMissioni().filter(function (m) { return !m.fuoriRosa && m.id !== 'm0'; });
+    var candidate = applicaCooldown(tutte, state);
     if (candidate.length === 0) {
       console.warn('PETQ.missions: nessuna scheda disponibile per la rosa del giorno');
       return [];
@@ -120,16 +188,16 @@ window.PETQ = window.PETQ || {};
     }
 
     var ordine = estraiOrdine();
-    var scelta = ordine.slice(0, 4).map(function (i) { return candidate[i]; });
+    var scelta = ordine.slice(0, DIM_ROSA).map(function (i) { return candidate[i]; });
 
     // se la copertura e' gia' >=3 o non ci sono abbastanza schede per migliorare, va bene cosi'
-    if (copertura(scelta) < 3 && candidate.length > 4) {
+    if (copertura(scelta) < 3 && candidate.length > DIM_ROSA) {
       // riprova con permutazioni successive dello stesso stream deterministico finche' non
       // trova una combinazione valida o esaurisce i tentativi (cap 20, resta deterministico
       // perche' il generatore e' seedato sempre allo stesso modo per la stessa data)
       for (var tentativo = 0; tentativo < 20; tentativo++) {
         var ord2 = estraiOrdine();
-        var tent = ord2.slice(0, 4).map(function (i) { return candidate[i]; });
+        var tent = ord2.slice(0, DIM_ROSA).map(function (i) { return candidate[i]; });
         if (copertura(tent) >= 3) { scelta = tent; break; }
       }
       if (copertura(scelta) < 3) {
@@ -431,14 +499,19 @@ window.PETQ = window.PETQ || {};
       return;
     }
 
-    // Dispensa: array di oggetti {nome} (non solo stringhe) per lasciare spazio a metadati
-    // futuri (es. scadenza, quantita') senza rompere la struttura quando care.js/feed la
-    // consumera'. Decisione presa qui in assenza di indicazioni piu' specifiche.
+    // Inventario/frigo (GDD "Economia" -> "Spesa e dispensa"): dispensa e' un array di
+    // {nome, qty}. Il cibo gratis dalle missioni incrementa la qty della riga esistente,
+    // o ne crea una nuova con qty 1 se il pet non ne possiede ancora.
     var mCibo = t.match(/^cibo:(.+)$/i);
     if (mCibo) {
       var nomeCibo = mCibo[1].trim();
       if (!Array.isArray(state.dispensa)) state.dispensa = [];
-      state.dispensa.push({ nome: nomeCibo });
+      var vociEsistenti = state.dispensa.filter(function (v) { return v.nome === nomeCibo; });
+      if (vociEsistenti.length > 0) {
+        vociEsistenti[0].qty = (vociEsistenti[0].qty || 0) + 1;
+      } else {
+        state.dispensa.push({ nome: nomeCibo, qty: 1 });
+      }
       rewardsOut.push({ tipo: 'cibo', nome: nomeCibo });
       return;
     }
@@ -549,6 +622,13 @@ window.PETQ = window.PETQ || {};
     // limite 1 missione al giorno (fix playtest): marca il giorno alla risoluzione;
     // avvia() rifiuta finche' non cambia data (il debug "Nuovo giorno" azzera questo campo)
     state.missioneGiorno = oggiStr();
+    // Cooldown missioni (bilanciamento.md "Cooldown missioni"): marca l'ultima esecuzione
+    // ALLA RISOLUZIONE (non all'avvio), cosi' una missione abbandonata a meta' (mai possibile
+    // nel prototipo, ma per coerenza futura) non entrerebbe in cooldown senza essere completata.
+    // Il tutorial m0 non passa mai da qui (risolviTutorial e' una funzione separata).
+    if (!scheda.tutorial) {
+      state.missioniFatte[scheda.id] = oggiStr();
+    }
 
     return risultato;
   }
@@ -562,7 +642,11 @@ window.PETQ = window.PETQ || {};
     tutorialDaProporre: tutorialDaProporre,
     risolviTutorial: risolviTutorial,
     _valutaCond: _valutaCond,
-    _scegliEsito: scegliEsito
+    _scegliEsito: scegliEsito,
+    _applicaCooldown: applicaCooldown,
+    _diffGiorniStr: diffGiorniStr,
+    _dimRosa: DIM_ROSA,
+    _cooldownGiorni: COOLDOWN_GIORNI
   };
 
 })();

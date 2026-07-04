@@ -131,16 +131,30 @@ Voce: energia infinita, tutto è un allenamento o una gara, motivational coach a
 - Nuovo corpo, nuovi record da battere. I vecchi li ho battuti crescendo. Letteralmente.
 
 ## Ha sonno (sotto soglia energia o prima delle 21)
-- [ESEMPIO] Coach, sono a secco di energie. Serve recupero vero, altrimenti crollo in campo.
+- Coach, sono a secco di energie. Serve recupero vero, altrimenti crollo in campo.
+- Coach, ho finito la benzina. Anche i campioni hanno il serbatoio. Il mio segna zero e fischia.
+- Sbadiglio da record. Cronometralo... no, non cronometrarlo, portami a letto e basta, coach.
+- Il fisico da campione richiede il recupero da campione. È scienza sportiva, non pigrizia. (Un po' pigrizia.)
+- Corro solo se il traguardo è il letto. Quella gara la vinco anche da stanchissimo.
 
 ## Va a dormire (dalle 21, portato a letto)
-- [ESEMPIO] Riposo da atleta, coach: sonno programmato, sveglia tra qualche ora. Non sgarro.
+- Riposo da atleta, coach: sonno programmato, sveglia tra qualche ora. Non sgarro.
+- A letto! Il recupero è parte dell'allenamento: quindi tecnicamente sto ANCORA vincendo.
+- Buonanotte, coach! Il sonno è il mio secondo sport preferito. E sono fortissimo pure lì.
+- Buonanotte! Sogno la finale. Nei sogni vinco sempre. L'arbitro sono io, ma vinco pulito.
 
 ## Sveglia (risveglio dopo il sonno)
-- [ESEMPIO] Sveglio e carico al cento per cento! Il recupero ha funzionato, si torna in campo!
+- Sveglio e carico al cento per cento! Il recupero ha funzionato, si torna in campo!
+- SVEGLIA! Colazione, stretching e gloria, nell'ordine che preferisci ma con la colazione prima.
+- Occhi aperti e ginocchia alte! Il materasso ha perso: ci ho provato a restare, GIURO, ma sono troppo forte.
+- Sveglio! Nei sogni ho corso tutta la notte. La conto come sessione di allenamento.
+- In piedi al primo squillo, come i professionisti. Il letto mi ha dato il cinque. A modo suo. Era un cuscino.
 
 ## Dormito male (crollato, non a letto)
-- [ESEMPIO] Ho dormito sul campo invece che negli spogliatoi. Recupero scarso, ma la grinta è intatta!
+- Ho dormito sul campo invece che negli spogliatoi. Recupero scarso, ma la grinta è intatta!
+- Ho dormito a bordo campo. Il fisioterapista immaginario è FURIOSO con te.
+- Schiena bloccata da pavimento. Il referto dice: "gestione atleta da rivedere". C'è il tuo nome sotto.
+- Recupero fallito: dormito dove sono crollato, come dopo una maratona. Senza medaglia, però. Manca proprio la medaglia.
 
 ## Usa una parola imparata
 - {parola}! Bella questa! La urlo quando vinco: {parola}!

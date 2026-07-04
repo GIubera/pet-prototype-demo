@@ -16,11 +16,22 @@ window.PETQ = window.PETQ || {};
       .replace(/\{parola\}/g, parola);
   }
 
-  // situazioni "contestuali" in cui il pet puo' usare spontaneamente una parola insegnata
-  // (GDD "Parola insegnata", fix playtest): saluto, felice — cioe' saluto/coccola/battuta
-  // automatica. MAI negli esiti missione ne' nelle situazioni critiche (fame/sporco/triste).
+  // Situazioni "contestuali" in cui il pet puo' usare spontaneamente una parola insegnata
+  // (GDD "Parola insegnata" / bilanciamento.md "Frequenza uso parola imparata", playtest —
+  // il fondatore non la vedeva mai): saluto e felice sono le uniche due chiavi di pool usate
+  // da situazionePrioritaria() in ui.js, ma coprono TUTTE E QUATTRO le situazioni richieste:
+  // - saluto: battuta automatica generica (ui.js battutaAutomatica) quando nessun'altra
+  //   situazione e' prioritaria
+  // - felice: battuta automatica quando Felicita' > 75, e battuta occasionale dopo una coccola
+  //   (ui.js eseguiCoccola -> battutaAutomatica) o dopo un pasto (ui.js eseguiFeed)
+  // - "apertura casa": battutaAutomatica() e' chiamata da renderStanza() ad ogni cambio
+  //   stanza/boot, quindi anche il primo giro all'apertura passa da qui
+  // MAI negli esiti missione (missione_successo/missione_fallimento hanno pool dedicati, mai
+  // instradati su 'parola') ne' nelle situazioni critiche fame/sporco/triste (escluse di
+  // proposito da questa mappa: si fondono nell'aggiornaHud ma la voce del pet nei momenti
+  // brutti non scherza con le parole imparate per gioco).
   var SITUAZIONI_PAROLA = { saluto: true, felice: true };
-  var PROB_PAROLA = 0.2;
+  var PROB_PAROLA = 0.3;
 
   function say(pet, situazione, state) {
     if (!pet) return '...';
@@ -29,8 +40,8 @@ window.PETQ = window.PETQ || {};
     var personalita = pet.personalita || 'gentile';
     var pools = data && data.personalita && data.personalita[personalita];
 
-    // ~20% delle battute contestuali pescano dal pool 'parola' se il giocatore
-    // ha insegnato almeno una parola ({parola} = una a caso tra le insegnate)
+    // 30% delle battute contestuali pescano dal pool 'parola' se il giocatore ha insegnato
+    // almeno una parola ({parola} = una a caso tra le insegnate, v. riempiSlot sopra)
     if (SITUAZIONI_PAROLA[situazione] && state && state.parole && state.parole.length > 0 &&
         pools && pools.parola && pools.parola.length > 0 && PETQ.rng.rand() < PROB_PAROLA) {
       situazione = 'parola';
@@ -55,6 +66,10 @@ window.PETQ = window.PETQ || {};
     return riempiSlot(scelta, pet, state);
   }
 
-  window.PETQ.dialog = { say: say };
+  window.PETQ.dialog = {
+    say: say,
+    _probParola: PROB_PAROLA,
+    _situazioniParola: SITUAZIONI_PAROLA
+  };
 
 })();

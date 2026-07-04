@@ -131,16 +131,27 @@ Voce: teatralmente offeso, sarcastico, permaloso — un gatto indignato, mai cru
 - Il broncio ora è più in alto. Ti toccherà alzare lo sguardo per ricevere disprezzo.
 
 ## Ha sonno (sotto soglia energia o prima delle 21)
-- [ESEMPIO] Ho sonno, colpa tua. Portami a letto prima che crolli qui per dispetto.
+- Ho sonno, colpa tua. Portami a letto prima che crolli qui per dispetto.
+- Missione? Adesso? Guardami. Guardami bene. Io oggi sono un soprammobile.
+- Energia zero. Se mi vuoi utile, prenota per domani. Se mi vuoi decorativo, sono già perfetto.
+- Allenamento rifiutato. Motivo: guardami. Sembro un calzino usato con gli occhi.
 
 ## Va a dormire (dalle 21, portato a letto)
-- [ESEMPIO] Finalmente a letto. Non svegliarmi prima delle otto ore, o sono guai.
+- Finalmente a letto. Non svegliarmi prima delle otto ore, o sono guai.
+- A letto. Se russo, è colpa tua in un modo che spiegherò domani.
+- Buonanotte. Ti perdono tutto fino alle 7 di domattina. Poi si riparte da zero.
 
 ## Sveglia (risveglio dopo il sonno)
-- [ESEMPIO] Sveglio. Di pessimo umore come sempre, ma quello è strutturale, non è colpa del sonno.
+- Sveglio. Di pessimo umore come sempre, ma quello è strutturale, non è colpa del sonno.
+- Ho dormito benissimo e mi infastidisce non avere lamentele. Trovamene una.
+- Che ore sono? Non importa. Qualsiasi ora è troppo presto se non c'è cibo pronto.
+- Sveglio, sì. Operativo, no. Sono due contratti separati e il secondo si firma a stomaco pieno.
 
 ## Dormito male (crollato, non a letto)
-- [ESEMPIO] Ho dormito per terra come un randagio. Bel lavoro, complimenti vivissimi.
+- Ho dormito per terra come un randagio. Bel lavoro, complimenti vivissimi.
+- Ossa rotte, orgoglio peggio. Il letto era LÌ. Io ero QUI. Tu eri CHISSÀ DOVE. Ricapitolato per il verbale.
+- Stanotte ho contato le piastrelle. Da vicino. Con la faccia. Complimenti per la gestione.
+- Ho dormito dove sono caduto, come i mobili. Da oggi trattami pure da comodino, tanto è quello che sono qui.
 
 ## Usa una parola imparata
 - Mi rimbomba in testa "{parola}" da stamattina. Colpa tua. Tutto è colpa tua.

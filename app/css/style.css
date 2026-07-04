@@ -199,6 +199,21 @@ button {
   gap: 6px;
 }
 
+/* Orologio di gioco (GDD "Casa" -> orologio in-game): HH:MM + icona sole/luna, in cima all'HUD */
+.petq-orologio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ccd2db;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #333a46;
+}
+
+.petq-orologio-icona { font-size: 14px; line-height: 1; }
+.petq-orologio-ora { letter-spacing: 0.5px; }
+
 .petq-barra-riga {
   display: grid;
   grid-template-columns: 60px 1fr 28px;

@@ -32,19 +32,22 @@ window.PETQ = window.PETQ || {};
 
   var DEFAULT_BILANCIAMENTO = {
     decadimento: { fame: 6, igiene: 8, felicita: 2 },
-    soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
+    soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40, sovralimentazione: 90 },
     economia: { login: 10, monetePartenza: 50 },
     allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
     iniziali: { benessere: 70, budget: 3, firma: 1 },
     energia_sonno: {
-      decadimento: 4,
+      decadimento: 2,
       costoMissionePerOra: 8,
       costoAllenamento: 10,
       sogliaRifiuto: 20,
       oraLetto: 21,
       oraCrollo: 23,
+      riposinoDurataMax: 2,
+      riposinoDurataMin: 1,
+      riposinoRecuperoOra: 15,
       sveglioAutonomoOre: 8,
-      sonnoMinimoOre: 6,
+      sonnoMinimoOre: 5,
       risveglioBuono: 100,
       risveglioCattivo: 70
     }
@@ -64,7 +67,8 @@ window.PETQ = window.PETQ || {};
       bilanciamento: null,
       missioni: []
     },
-    load: load
+    load: load,
+    _parseBilanciamento: parseBilanciamento // esposto per test di parsing (pattern _get*/_assert* del codebase)
   };
 
   function load(callback) {
@@ -880,6 +884,7 @@ window.PETQ = window.PETQ || {};
       ['variante magra', ['soglie', 'magro'], -1],
       ['overlay sporco', ['soglie', 'sporco'], -1],
       ['malus missione da salute', ['soglie', 'malusSalute'], 0],
+      ['soglia sovralimentazione', ['soglie', 'sovralimentazione'], 0],
       ['login giornaliero', ['economia', 'login'], 0],
       ['monete iniziali', ['economia', 'monetePartenza'], 0],
       ['sessioni al giorno', ['allenamento', 'sessioni'], 0],
@@ -889,10 +894,14 @@ window.PETQ = window.PETQ || {};
       ['soglia rifiuto', ['energia_sonno', 'sogliaRifiuto'], -1],
       ['ora del letto', ['energia_sonno', 'oraLetto'], -1],
       ['ora del crollo automatico', ['energia_sonno', 'oraCrollo'], -1],
-      ['sveglia autonoma dopo', ['energia_sonno', 'sveglioAutonomoOre'], 0],
-      ['sonno minimo per sveglia', ['energia_sonno', 'sonnoMinimoOre'], -1],
-      ['energia al risveglio (dormito bene', ['energia_sonno', 'risveglioBuono'], -1],
-      ['energia al risveglio (crollato', ['energia_sonno', 'risveglioCattivo'], -1]
+      ['riposino (prima delle 21) — durata max', ['energia_sonno', 'riposinoDurataMax'], -1],
+      ['riposino — durata minima', ['energia_sonno', 'riposinoDurataMin'], -1],
+      ['recupero riposino', ['energia_sonno', 'riposinoRecuperoOra'], 0],
+      ['sonno notturno (dalle 21) — durata max', ['energia_sonno', 'sveglioAutonomoOre'], -1],
+      ['sonno notturno — durata minima', ['energia_sonno', 'sonnoMinimoOre'], -1],
+      ['energia al risveglio notturno (≥5h', ['energia_sonno', 'risveglioBuono'], -1],
+      ['energia al risveglio notturno (crollato', ['energia_sonno', 'risveglioCattivo'], -1],
+      ['energia al risveglio (crollato/dormito male)', ['energia_sonno', 'risveglioCattivo'], -1]
     ];
 
     for (var i = 0; i < mappa.length; i++) {

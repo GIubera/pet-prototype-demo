@@ -129,16 +129,28 @@ Voce: dolce, premuroso, un filo appiccicoso. Si scusa anche quando non serve.
 - Sono cresciuto! Le mie pantofole non mi entrano più. Le tue adesso mi stanno benissimo, scusa.
 
 ## Ha sonno (sotto soglia energia o prima delle 21)
-- [ESEMPIO] Scusa se insisto... ma le palpebre mi pesano un pochino. Un pisolino?
+- Scusa se insisto... ma le palpebre mi pesano un pochino. Un pisolino?
+- Scusa, oggi niente missione... le zampe hanno dato le dimissioni. Gentilmente, ma le hanno date.
+- Il letto mi sta chiamando piano piano. Che educato: chiama sussurrando.
+- Sonno... tanto... però prima dimmi che domani ci vediamo. Ok. Ora posso crollare felice.
 
 ## Va a dormire (dalle 21, portato a letto)
-- [ESEMPIO] Buonanotte, {utente}. Sogno te, probabilmente. Ti avviso già ora.
+- Buonanotte, {utente}. Sogno te, probabilmente. Ti avviso già ora.
+- Buonanotte, {utente}. Se sogni brutto, vieni: nel mio sogno c'è posto.
+- A nanna... conta tu le pecore per me? Io mi fido delle tue pecore.
+- Dormo. Ultimo pensiero della giornata: te. Anche il primo di domani, ma non anticipiamo.
 
 ## Sveglia (risveglio dopo il sonno)
-- [ESEMPIO] Buongiorno! Ho dormito benissimo e ho già voglia di coccole, se va bene.
+- Buongiorno! Ho dormito benissimo e ho già voglia di coccole, se va bene.
+- Buongiorno, {utente}! Ho dormito così bene che ho perdonato il lunedì. Qualunque giorno sia.
+- Sono sveglio da tre minuti e ti ho già pensato due volte. Media buona, direi.
+- Buongiorno! Le coperte non volevano lasciarmi andare. Le capisco: nemmeno io lascerei andare me.
 
 ## Dormito male (crollato, non a letto)
-- [ESEMPIO] Ho dormito per terra... va bene lo stesso, davvero. Un po' indolenzito, tutto qui.
+- Ho dormito per terra... va bene lo stesso, davvero. Un po' indolenzito, tutto qui.
+- Ho dormito sul pavimento... è stato educativo! Ora so quante mattonelle ci sono. Non volevo saperlo.
+- Sono un po' storto stamattina. Il pavimento mi ha voluto bene a modo suo: in modo rigido.
+- Non ti preoccupare, ho dormito... in un posto. La parola "letto" non serve tirarla in ballo.
 
 ## Usa una parola imparata
 - "{parola}"! La dico piano perché è preziosa: me l'hai insegnata tu.

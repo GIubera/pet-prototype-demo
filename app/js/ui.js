@@ -24,6 +24,14 @@ window.PETQ = window.PETQ || {};
     if (perTema && perTema[tema]) return perTema[tema];
     return { x: 14, y: 20, w: 40, h: 30 };
   }
+
+  // hotzone frigo (coordinate logiche stanza, cucina — GDD "Economia" -> "Spesa e dispensa"):
+  // rettangolo esposto da PETQ.rooms._frigoZona.cucina[tema], stesso pattern hotzoneLetto sopra.
+  function hotzoneFrigo(tema) {
+    var perTema = PETQ.rooms && PETQ.rooms._frigoZona && PETQ.rooms._frigoZona.cucina;
+    if (perTema && perTema[tema]) return perTema[tema];
+    return { x: 6, y: 10, w: 16, h: 34 };
+  }
   // posizione del pet mentre dorme A LETTO (dentro il rettangolo letto, camera: v. rooms.js
   // LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA, entrambe abbastanza generose da ospitare questo punto)
   var SLEEP_BED_POS = { x: 22, y: 30 };
@@ -84,6 +92,8 @@ window.PETQ = window.PETQ || {};
   var battutaPartenza = null;     // battuta 'missione_partenza' mostrata sulla card in corso
   var missioneSelezionata = null; // id del pin selezionato sulla mappa missioni
   var mapPointer = null;          // gesto in corso sul canvas mappa
+  var frigoAperto = false;        // pannello frigo (cucina) aperto/chiuso
+  var negozioSelezionato = false; // pannello acquisto shop (mappa) aperto/chiuso
 
   // ---------- util ----------
 
@@ -99,6 +109,23 @@ window.PETQ = window.PETQ || {};
     var mese = String(d.getMonth() + 1).padStart(2, '0');
     var giorno = String(d.getDate()).padStart(2, '0');
     return d.getFullYear() + '-' + mese + '-' + giorno;
+  }
+
+  // Debug "Nuovo giorno": retrodata di N giorni ogni voce di state.missioniFatte (mappa
+  // {id: 'YYYY-MM-DD'}), cosi' il cooldown missioni (3 giorni, v. missions.js) si puo' testare
+  // senza aspettare la mezzanotte reale. Formato data stringa: costruiamo la data a mezzogiorno
+  // per evitare sfasamenti da fuso/ora legale, stesso pattern di missions.js diffGiorniStr.
+  function retrodataCooldownMissioni(state, giorni) {
+    if (!state || !state.missioniFatte || typeof state.missioniFatte !== 'object') return;
+    var chiavi = Object.keys(state.missioniFatte);
+    for (var i = 0; i < chiavi.length; i++) {
+      var dataStr = state.missioniFatte[chiavi[i]];
+      var d = new Date(dataStr + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() - giorni);
+      var mese = String(d.getUTCMonth() + 1).padStart(2, '0');
+      var giorno = String(d.getUTCDate()).padStart(2, '0');
+      state.missioniFatte[chiavi[i]] = d.getUTCFullYear() + '-' + mese + '-' + giorno;
+    }
   }
 
   function el(tag, cls, txt) {
@@ -357,12 +384,20 @@ window.PETQ = window.PETQ || {};
       arredi: { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [] } },
       parole: [],
       missione: null,
+      missioniFatte: {},
       ferite: 0,
       cureOggi: 0,
-      dispensa: [],
+      // Inventario/frigo (GDD "Economia" -> "Spesa e dispensa"): array di {nome, qty}. Stock
+      // iniziale 3 Crocchette semplici cosi' la cucina non e' vuota al primo avvio.
+      dispensa: [{ nome: 'Crocchette semplici', qty: 3 }],
       categoriePastiOggi: [],
-      tutorialFatto: false
+      tutorialFatto: false,
+      sonno: null
     };
+    // orologio di gioco: parte dall'ora REALE corrente (stessa regola di migrazione dei
+    // salvataggi esistenti, v. clock.js inizializzaOrologio), cosi' anche una partita nuova
+    // iniziata di sera parte gia' vicina alla notte di gioco.
+    if (PETQ.clock && PETQ.clock.inizializzaOrologio) PETQ.clock.inizializzaOrologio(state);
 
     PETQ.save.save(state);
     PETQ.main.avviaTicking(state);
@@ -378,6 +413,8 @@ window.PETQ = window.PETQ || {};
     currentState = state;
     currentStanza = 'cucina';
     collezioneAperta = false;
+    frigoAperto = false;
+    negozioSelezionato = null;
     missioneSelezionata = null;
     mapPointer = null;
 
@@ -493,6 +530,8 @@ window.PETQ = window.PETQ || {};
     if (!hud || !state || !state.pet) return;
     hud.innerHTML = '';
 
+    hud.appendChild(costruisciOrologioHud(state));
+
     var barre = [
       ['Fame', state.pet.stats.fame],
       ['Igiene', state.pet.stats.igiene],
@@ -553,6 +592,23 @@ window.PETQ = window.PETQ || {};
     hud.appendChild(monete);
   }
 
+  // Orologio di gioco nell'HUD (GDD "Casa" -> orologio in-game): HH:MM da PETQ.clock.oraGioco
+  // + icona sole/luna. Notte di gioco = 21:00-07:59 (PETQ.clock.eNotteGioco, stessa soglia
+  // "ora del letto" del bilanciamento sonno). Aggiornata ad ogni aggiornaHud (render/tick).
+  function costruisciOrologioHud(state) {
+    var wrap = el('div', 'petq-orologio');
+    if (!PETQ.clock || !PETQ.clock.oraGioco) return wrap;
+
+    var es = (PETQ.pet && PETQ.pet.bilEnergiaSonno) ? PETQ.pet.bilEnergiaSonno() : { oraLetto: 21 };
+    var og = PETQ.clock.oraGioco(state);
+    var notte = PETQ.clock.eNotteGioco(state, es.oraLetto, 8);
+
+    wrap.appendChild(el('span', 'petq-orologio-icona', notte ? '🌙' : '☀️'));
+    wrap.appendChild(el('span', 'petq-orologio-ora', og.hhmm));
+    wrap.title = notte ? 'Notte di gioco' : 'Giorno di gioco';
+    return wrap;
+  }
+
   function coloreBarra(val) {
     if (val > 50) return 'petq-barra-verde';
     if (val >= 25) return 'petq-barra-gialla';
@@ -605,13 +661,20 @@ window.PETQ = window.PETQ || {};
       var petCanvas = document.createElement('canvas');
       petCanvas.width = PET_PX;
       petCanvas.height = PET_PX;
-      PETQ.sprites.draw(petCanvas, petLikeDaState(state), { frame: idleFrame });
+
+      if (state.sonno) {
+        // Dorme: sprite SDRAIATO orizzontale (non in piedi) + Zzz, sia sul letto sia
+        // crollato a terra (GDD "Energia e sonno" -> Zzz animati). drawSdraiato include gia'
+        // l'overlay drawSonno (palpebre+Zzz) al suo interno, niente overlaySonno separato.
+        PETQ.sprites.drawSdraiato(petCanvas, petLikeDaState(state), { frame: idleFrame });
+      } else {
+        PETQ.sprites.draw(petCanvas, petLikeDaState(state), { frame: idleFrame });
+      }
 
       var pctx = petCanvas.getContext('2d');
       if (effetto && effetto.tipo === 'wash') overlaySchiuma(pctx, idleFrame);
       if (effetto && effetto.tipo === 'crumbs') overlayBriciole(pctx, idleFrame);
       if (effetto && effetto.tipo === 'cura') overlayCura(pctx, idleFrame);
-      if (state.sonno) overlaySonno(pctx, idleFrame);
 
       g.drawImage(petCanvas, pos.x, pos.y);
 
@@ -798,24 +861,6 @@ window.PETQ = window.PETQ || {};
     for (var i = 0; i < punti.length; i++) {
       ctx.fillRect(punti[i][0] * s, punti[i][1] * s, s, s);
     }
-  }
-
-  // overlay sonno: palpebre chiuse + Zzz (API grafica con guard, stesso stile overlaySchiuma/Briciole)
-  function overlaySonno(ctx, frame) {
-    if (PETQ.sprites && PETQ.sprites.drawSonno) {
-      PETQ.sprites.drawSonno(ctx, frame);
-      return;
-    }
-    // fallback minimale: due trattini scuri (occhi chiusi) + una "z" sopra la testa
-    var s = ctx.canvas.width / PET_SIZE;
-    ctx.fillStyle = 'rgba(20,20,24,0.75)';
-    ctx.fillRect(3 * s, 6 * s, 4 * s, s);
-    ctx.fillRect(9 * s, 6 * s, 4 * s, s);
-    ctx.fillStyle = '#dfe4ec';
-    var zx = frame === 1 ? 12 : 10;
-    ctx.fillRect(zx * s, -1 * s, 3 * s, s);
-    ctx.fillRect((zx + 1) * s, 0, s, s);
-    ctx.fillRect(zx * s, s, 3 * s, s);
   }
 
   // effetto infermeria: croce rossa + cuoricini sul canvas del pet (2 frame alternati)
@@ -1031,6 +1076,9 @@ window.PETQ = window.PETQ || {};
       var target = null, poopIdx = -1;
       if (lastPetRect && dentroRect(p, lastPetRect, 3)) {
         target = 'pet';
+      } else if (currentStanza === 'cucina' && !currentState.missione &&
+                 dentroRect(p, hotzoneFrigo(temaRazza(currentState.pet)), 0)) {
+        target = 'frigo';
       } else {
         poopIdx = hitPoop(p);
         if (poopIdx !== -1) target = 'poop';
@@ -1106,6 +1154,8 @@ window.PETQ = window.PETQ || {};
         }
       } else if (cp.target === 'poop') {
         eseguiPuliziaBisogni(cp.poopIdx);
+      } else if (cp.target === 'frigo') {
+        apriFrigo();
       }
     }
 
@@ -1165,20 +1215,13 @@ window.PETQ = window.PETQ || {};
     });
   }
 
-  // Drag del pet nel letto (camera, GDD "Energia e sonno"): prima delle 21 il pet rifiuta
-  // di dormire, e lo dice SEMPRE con un balloon (fix playtest 7a: mai silenzio). Dopo le 21,
-  // via libera: PETQ.pet.avviaSonno(state, true) marca aLetto cosi' il risveglio da' Energia
-  // piena dopo >=6h dormite (v. pet.js risolviRisveglio).
+  // Drag del pet nel letto (camera, GDD "Energia e sonno" aggiornato): "Dormire" e' un unico
+  // gesto, niente piu' rifiuto prima delle 21 (fix di questa sessione: era l'ostacolo che
+  // impediva di testare il sonno col debug ×600, perche' l'ora reale non avanzava mai).
+  // La modalita' (riposino/notturno) la decide PETQ.pet.avviaSonno in base all'orologio DI
+  // GIOCO corrente (PETQ.clock.oraGioco): il pet PUO' SEMPRE essere messo a dormire.
   function provaAndareALetto() {
     if (!currentState || !currentState.pet || currentState.sonno || currentState.missione) return;
-    var es = (PETQ.pet && PETQ.pet.bilEnergiaSonno) ? PETQ.pet.bilEnergiaSonno() : { oraLetto: 21 };
-    var oraAttuale = new Date().getHours();
-    if (oraAttuale < es.oraLetto) {
-      mostraBalloon(PETQ.dialog.say(currentState.pet, 'sonno', currentState) ||
-        ((currentState.pet.nome || 'Il pet') + ' non ha ancora sonno, è troppo presto.'));
-      disegnaStanzaEPet(currentState);
-      return;
-    }
     PETQ.pet.avviaSonno(currentState, true);
     PETQ.save.save(currentState);
     disegnaStanzaEPet(currentState);
@@ -1186,43 +1229,49 @@ window.PETQ = window.PETQ || {};
     mostraBalloon(PETQ.dialog.say(currentState.pet, 'dormire', currentState));
   }
 
-  // Tap sul pet mentre dorme: sveglia manuale, l'energia dipende da quante ore ha dormito
-  // (v. pet.js risolviRisveglio/svegliaManuale).
+  // Tap sul pet mentre dorme (canvas stanza): equivale al tasto Sveglia, stessa regola dei
+  // minimi (v. eseguiSveglia sotto, condivisa col bottone renderizzato in renderAzioniCamera).
   function eseguiSveglia() {
-    if (!currentState || !currentState.sonno) return;
+    tentaSveglia();
+  }
+
+  // Tenta di svegliare il pet: rispetta il minimo di ore dormite (GDD: riposino 1h, notturno
+  // 5h). Sotto il minimo niente sveglia, solo una battuta di protesta (bottone disabilitato
+  // nella UI, ma questa funzione e' la stessa richiamata dal tap sul pet quindi la guardia
+  // va ripetuta qui). Ritorna true se la sveglia e' avvenuta.
+  function tentaSveglia() {
+    if (!currentState || !currentState.sonno || !PETQ.pet) return false;
+    var stato = PETQ.pet.puoSvegliare(currentState);
+    if (!stato.puo) {
+      mostraBalloon(PETQ.dialog.say(currentState.pet, 'sonno', currentState) ||
+        ((currentState.pet.nome || 'Il pet') + ' sta ancora dormendo, lascialo riposare.'));
+      return false;
+    }
     var risultato = PETQ.pet.svegliaManuale(currentState);
     PETQ.save.save(currentState);
     disegnaStanzaEPet(currentState);
     aggiornaHud(currentState);
     renderAzioni();
     if (risultato) mostraBalloon(PETQ.dialog.say(currentState.pet, risultato.battuta, currentState));
+    return true;
   }
 
+  // Dai da mangiare (GDD "Economia" -> "Spesa e dispensa"): sempre gratis, il pagamento e'
+  // gia' avvenuto allo shop. PETQ.care.feed consuma direttamente 1 porzione da state.dispensa
+  // per nome (v. care.js consumaDaDispensa): qui non serve piu' fare lo splice manuale ne'
+  // controllare le monete, solo reagire all'esito (frigo vuoto per quel cibo = errore raro,
+  // capita solo per doppio-tap velocissimo su qty=1).
   function eseguiFeed(cibo, cardEl, dispensaIdx) {
     if (currentState.missione) {
       shakeCard(cardEl);
       mostraToast((currentState.pet.nome || 'Il pet') + ' è in missione: la pappa può aspettare.');
       return;
     }
-    var daDispensa = typeof dispensaIdx === 'number';
-    var ciboEff = cibo;
-    if (daDispensa) {
-      // copia a costo zero: il cibo della dispensa è già stato "pagato" dalla missione
-      ciboEff = { nome: cibo.nome, categoria: cibo.categoria, costo: 0, fame: cibo.fame, stat: cibo.stat, statNome: cibo.statNome };
-    }
-    if (currentState.coins < ciboEff.costo) {
-      shakeCard(cardEl);
-      mostraToast('Monete insufficienti.');
-      return;
-    }
-    var r = PETQ.care.feed(currentState, ciboEff);
+    var r = PETQ.care.feed(currentState, cibo);
     if (!r.ok) {
       shakeCard(cardEl);
       mostraToast(r.msg);
       return;
-    }
-    if (daDispensa && Array.isArray(currentState.dispensa) && dispensaIdx < currentState.dispensa.length) {
-      currentState.dispensa.splice(dispensaIdx, 1);
     }
     PETQ.save.save(currentState);
     aggiornaHud(currentState);
@@ -1272,6 +1321,11 @@ window.PETQ = window.PETQ || {};
     setTimeout(function () { cardEl.classList.remove('petq-shake'); }, 450);
   }
 
+  // Dopo un'azione (train/teachWord/cura...): salva, ridisegna e controlla il ciclo sonno.
+  // Il controllo e' importante soprattutto per l'allenamento (bilanciamento.md "Durata
+  // allenamento"): avanzando l'orologio di gioco di 90 minuti puo' far scattare l'ora del
+  // crollo automatico (23:00) o, in teoria con offset di giornata estremi, un nuovo giorno —
+  // stesso meccanismo idempotente gia' usato dal tick/boot (controllaSonnoScaduto).
   function dopoAzione(risultato) {
     PETQ.save.save(currentState);
     aggiornaHud(currentState);
@@ -1282,6 +1336,7 @@ window.PETQ = window.PETQ || {};
     } else if (risultato && risultato.msg) {
       mostraBalloon(risultato.msg);
     }
+    controllaSonnoScaduto();
   }
 
   // ---------- azioni per stanza ----------
@@ -1298,18 +1353,38 @@ window.PETQ = window.PETQ || {};
     else renderAzioniSalone(azioni);
   }
 
-  // --- camera: solo suggerimenti, l'azione è drag/tap sul canvas (letto/sveglia) ---
+  // --- camera: hint + tasto Sveglia (l'unica altra azione è drag sul canvas: letto) ---
 
   function renderAzioniCamera(container) {
     var nome = currentState.pet.nome || 'il pet';
     if (currentState.sonno) {
-      container.appendChild(el('p', 'petq-hint', nome + ' sta dormendo. Tocca per svegliarlo.'));
+      var modalita = currentState.sonno.modalita === 'riposino' ? 'un riposino' : 'la nanna notturna';
+      container.appendChild(el('p', 'petq-hint', nome + ' sta facendo ' + modalita + '.'));
+      container.appendChild(costruisciTastoSveglia(nome));
     } else if (currentState.missione) {
       container.appendChild(el('p', 'petq-hint', nome + ' è in missione: il letto aspetta il suo ritorno.'));
     } else {
-      var es = (PETQ.pet && PETQ.pet.bilEnergiaSonno) ? PETQ.pet.bilEnergiaSonno() : { oraLetto: 21 };
-      container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire (dalle ' + es.oraLetto + ':00).'));
+      container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire: riposino di giorno, nanna vera dalle 21:00.'));
     }
+  }
+
+  // Tasto Sveglia (GDD "Energia e sonno"): sempre visibile mentre dorme, ma disabilitato
+  // sotto il minimo di ore dormite (riposino 1h, notturno 5h) con il motivo esplicito.
+  function costruisciTastoSveglia(nome) {
+    var wrap = el('div', 'petq-riga-azione');
+    var stato = PETQ.pet.puoSvegliare(currentState);
+    var btn = el('button', 'petq-btn', 'Sveglia');
+    if (!stato.puo) {
+      btn.disabled = true;
+      var motivo = 'Sta ancora riposando, ancora ' + stato.minutiMancanti + 'm.';
+      btn.title = motivo;
+      wrap.appendChild(btn);
+      wrap.appendChild(el('p', 'petq-hint', motivo));
+      return wrap;
+    }
+    btn.addEventListener('click', function () { tentaSveglia(); });
+    wrap.appendChild(btn);
+    return wrap;
   }
 
   function trovaCibo(nome) {
@@ -1336,29 +1411,45 @@ window.PETQ = window.PETQ || {};
     return { nome: nome, categoria: 'base', costo: 0, fame: 20, stat: 0, statNome: null };
   }
 
-  // --- cucina: barra cibi orizzontale con drag + tap per dettagli ---
+  // --- cucina: tap sul FRIGO -> menu del cibo POSSEDUTO (GDD "Economia" -> "Spesa e
+  // dispensa"): niente più barra cibo orizzontale, niente più costo qui (già pagato allo
+  // shop). Il pannello si apre/chiude con frigoAperto; ogni voce ha tap (dà subito) o drag
+  // (riusa lo stesso gesto della vecchia barra) verso il pet in scena.
+
+  function apriFrigo() {
+    if (!currentState || currentState.missione) return;
+    frigoAperto = !frigoAperto;
+    renderAzioni();
+  }
 
   function renderAzioniCucina(container) {
-    var data = window.PETQ.content && window.PETQ.content.data;
-    var cibi = (data && data.cibi) ? data.cibi : [];
+    var nome = currentState.pet.nome || 'il pet';
+    var hintCucina = currentState.missione
+      ? nome + ' è in missione: la pappa aspetta il suo ritorno.'
+      : 'Tocca il frigo per vedere cosa avete in casa.';
+    container.appendChild(el('p', 'petq-hint', hintCucina));
 
-    if (cibi.length === 0) {
-      container.appendChild(el('p', 'petq-vuoto', 'Nessun cibo disponibile.'));
+    if (currentState.missione) return;
+
+    var dispensa = currentState.dispensa || [];
+    if (!frigoAperto) {
+      var apriBtn = el('button', 'petq-btn petq-btn-piccolo', 'Apri frigo (' + dispensa.length + ')');
+      apriBtn.addEventListener('click', apriFrigo);
+      container.appendChild(apriBtn);
       return;
     }
 
-    var hintCucina = currentState.missione
-      ? (currentState.pet.nome || 'Il pet') + ' è in missione: la pappa aspetta il suo ritorno.'
-      : 'Trascina un cibo nella stanza per darlo a ' + (currentState.pet.nome || 'lui') + '. Tocca per i dettagli.';
-    container.appendChild(el('p', 'petq-hint', hintCucina));
+    var chiudiBtn = el('button', 'petq-btn petq-btn-piccolo', 'Chiudi frigo');
+    chiudiBtn.addEventListener('click', apriFrigo);
+    container.appendChild(chiudiBtn);
 
-    var bar = el('div', 'petq-food-bar');
-    var dettaglio = el('div', 'petq-food-detail');
-    dettaglio.style.display = 'none';
+    if (dispensa.length === 0) {
+      container.appendChild(el('p', 'petq-vuoto', 'Il frigo è vuoto: fai un salto al Market sulla mappa.'));
+      return;
+    }
 
-    // prima i cibi in dispensa (gratis, dai reward missione), poi il negozio
-    var dispensa = currentState.dispensa || [];
-    for (var d = 0; d < dispensa.length; d++) {
+    var lista = el('div', 'petq-food-bar');
+    for (var i = 0; i < dispensa.length; i++) {
       (function (voce, idx) {
         var cibo = trovaCibo(voce.nome) || ciboFallback(voce.nome);
         var card = el('div', 'petq-food-card petq-food-card-dispensa');
@@ -1370,36 +1461,18 @@ window.PETQ = window.PETQ || {};
         card.appendChild(icona);
 
         card.appendChild(el('div', 'petq-food-nome', cibo.nome));
-        card.appendChild(el('div', 'petq-food-tag', 'dispensa'));
+        card.appendChild(el('div', 'petq-food-tag', 'x' + (voce.qty || 0)));
+        var effettiEl = el('div', 'petq-food-costo', descriviCibo(cibo));
+        card.appendChild(effettiEl);
 
-        installaDragCibo(card, cibo, dettaglio, idx);
-        bar.appendChild(card);
-      })(dispensa[d], d);
+        card.addEventListener('click', function () {
+          if (!foodPointer) eseguiFeed(cibo, card, idx);
+        });
+        installaDragCibo(card, cibo, idx);
+        lista.appendChild(card);
+      })(dispensa[i], i);
     }
-
-    for (var i = 0; i < cibi.length; i++) {
-      (function (cibo) {
-        var card = el('div', 'petq-food-card');
-
-        var icona = document.createElement('canvas');
-        icona.width = 12; icona.height = 12;
-        icona.className = 'petq-food-icon';
-        disegnaCibo(icona, cibo);
-        card.appendChild(icona);
-
-        card.appendChild(el('div', 'petq-food-nome', cibo.nome));
-        var costoCls = 'petq-food-costo' + (currentState.coins < cibo.costo ? ' petq-food-costo-no' : '');
-        var costoEl = el('div', costoCls, String(cibo.costo));
-        costoEl.title = cibo.costo + ' monete';
-        card.appendChild(costoEl);
-
-        installaDragCibo(card, cibo, dettaglio);
-        bar.appendChild(card);
-      })(cibi[i]);
-    }
-
-    container.appendChild(bar);
-    container.appendChild(dettaglio);
+    container.appendChild(lista);
   }
 
   function descriviCibo(cibo) {
@@ -1408,32 +1481,10 @@ window.PETQ = window.PETQ || {};
     return effetti;
   }
 
-  function mostraDettaglioCibo(dettaglio, cibo, card, dispensaIdx) {
-    var chiave = cibo.nome + (typeof dispensaIdx === 'number' ? '#d' + dispensaIdx : '');
-    if (dettaglio.dataset.cibo === chiave && dettaglio.style.display !== 'none') {
-      dettaglio.style.display = 'none';
-      dettaglio.dataset.cibo = '';
-      return;
-    }
-    dettaglio.dataset.cibo = chiave;
-    dettaglio.innerHTML = '';
-
-    var costoTesto = (typeof dispensaIdx === 'number') ? 'gratis (dispensa)' : cibo.costo + ' monete';
-    var info = el('div', 'petq-cibo-info');
-    info.appendChild(el('div', 'petq-cibo-nome', cibo.nome + ' — ' + costoTesto));
-    info.appendChild(el('div', 'petq-cibo-effetti', descriviCibo(cibo)));
-    dettaglio.appendChild(info);
-
-    var btn = el('button', 'petq-btn petq-btn-piccolo', 'Dai');
-    btn.addEventListener('click', function () {
-      eseguiFeed(cibo, card, dispensaIdx);
-    });
-    dettaglio.appendChild(btn);
-
-    dettaglio.style.display = 'flex';
-  }
-
-  function installaDragCibo(card, cibo, dettaglio, dispensaIdx) {
+  // Drag di una card cibo del frigo verso la scena (stesso gesto della vecchia barra cibo):
+  // se il rilascio cade sul canvas stanza, da' da mangiare (eseguiFeed). Il tap semplice (niente
+  // drag) e' gia' gestito dal listener 'click' della card in renderAzioniCucina.
+  function installaDragCibo(card, cibo, dispensaIdx) {
     card.addEventListener('pointerdown', function (e) {
       if (animazioneInCorso) return;
       foodPointer = {
@@ -1486,10 +1537,8 @@ window.PETQ = window.PETQ || {};
                        e.clientY >= r.top && e.clientY <= r.bottom;
           if (dentro) eseguiFeed(fp.cibo, fp.card, dispensaIdx);
         }
-        return;
       }
-
-      if (!annullato) mostraDettaglioCibo(dettaglio, fp.cibo, fp.card, dispensaIdx);
+      // tap semplice (niente drag): gestito dal listener 'click' della card, niente da fare qui.
     }
 
     card.addEventListener('pointerup', function (e) { fine(e, false); });
@@ -1837,10 +1886,10 @@ window.PETQ = window.PETQ || {};
     var nome = currentState.pet.nome || 'il pet';
 
     var hint;
-    if (sm.inCorso) hint = nome + ' è in giro per la città: eccolo sulla mappa.';
+    if (sm.inCorso) hint = nome + ' è in giro per la città: eccolo sulla mappa. Il Market resta aperto.';
     else if (sm.tutorial) hint = 'Primo giorno: tocca il pin del negozio di giocattoli.';
-    else if (sm.esaurita) hint = 'Missione di oggi completata: torna domani per una nuova rosa.';
-    else hint = 'Scegli una destinazione per ' + nome + '.';
+    else if (sm.esaurita) hint = 'Missione di oggi completata: torna domani per una nuova rosa. Il Market resta aperto.';
+    else hint = 'Scegli una destinazione per ' + nome + ', o fai la spesa al Market.';
     container.appendChild(el('p', 'petq-hint', hint));
 
     var mappaWrap = el('div', 'petq-mappa-wrap');
@@ -1893,18 +1942,23 @@ window.PETQ = window.PETQ || {};
     var attivi = (sm && sm.attivi) || [];
     var mw = PETQ.rooms._MAPPA_W, mh = PETQ.rooms._MAPPA_H;
 
-    for (var i = 0; i < attivi.length; i++) {
-      var id = attivi[i];
-      var rect = pins[id];
-      var nomeBreve = NOME_BREVE_LUOGO[id];
-      if (!rect || !nomeBreve) continue;
-
-      var chip = el('div', 'petq-mappa-etichetta', nomeBreve);
+    function piazzaEtichetta(rect, testo) {
+      if (!rect || !testo) return;
+      var chip = el('div', 'petq-mappa-etichetta', testo);
       var cx = rect.x + rect.w / 2;
       var yTop = Math.max(0, rect.y - 2); // appena sopra il luogo/pin, dentro il canvas
       chip.style.left = (cx / mw * 100) + '%';
       chip.style.top = (yTop / mh * 100) + '%';
       wrap.appendChild(chip);
+    }
+
+    for (var i = 0; i < attivi.length; i++) {
+      piazzaEtichetta(pins[attivi[i]], NOME_BREVE_LUOGO[attivi[i]]);
+    }
+    // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): etichetta SEMPRE visibile, il pin non
+    // fa parte della rosa a rotazione quindi non passa mai da 'attivi'.
+    if (PETQ.rooms && PETQ.rooms._shopPin) {
+      piazzaEtichetta(PETQ.rooms._shopPin, 'Market');
     }
   }
 
@@ -1912,6 +1966,14 @@ window.PETQ = window.PETQ || {};
     var dettaglio = document.getElementById('petq-mappa-dettaglio');
     if (!dettaglio) return;
     dettaglio.innerHTML = '';
+
+    // shop cibo: pannello acquisto, ha priorità su tutto il resto (sempre accessibile, non è
+    // una missione — v. GDD "Economia" -> "Spesa e dispensa")
+    if (negozioSelezionato) {
+      dettaglio.appendChild(pannelloShop());
+      dettaglio.style.display = '';
+      return;
+    }
 
     // missione in corso: il dettaglio è sempre la card col countdown, niente selezione
     if (sm.inCorso) {
@@ -1944,6 +2006,78 @@ window.PETQ = window.PETQ || {};
     dettaglio.style.display = '';
   }
 
+  // ---------- shop cibo (pin permanente sulla mappa, GDD "Economia" -> "Spesa e dispensa") ----------
+  // Menu ACQUISTO (non una missione): lista dei cibi da content/cibi.md con prezzo; "Compra"
+  // acquista 1 porzione, ripetibile, scala le monete e incrementa la qty in dispensa (frigo).
+  function pannelloShop() {
+    var wrap = el('div', 'petq-missione-card petq-shop-card');
+    wrap.appendChild(el('div', 'petq-missione-titolo', 'Market'));
+    wrap.appendChild(el('div', 'petq-missione-meta', 'Compra cibo: finisce nel frigo in cucina, gratis da lì in poi.'));
+
+    var data = window.PETQ.content && window.PETQ.content.data;
+    var cibi = (data && data.cibi) || [];
+    if (cibi.length === 0) {
+      wrap.appendChild(el('p', 'petq-vuoto', 'Nessun cibo disponibile.'));
+      return wrap;
+    }
+
+    var lista = el('div', 'petq-shop-lista');
+    for (var i = 0; i < cibi.length; i++) {
+      (function (cibo) {
+        var riga = el('div', 'petq-shop-riga');
+
+        var icona = document.createElement('canvas');
+        icona.width = 12; icona.height = 12;
+        icona.className = 'petq-food-icon';
+        disegnaCibo(icona, cibo);
+        riga.appendChild(icona);
+
+        var info = el('div', 'petq-shop-info');
+        info.appendChild(el('div', 'petq-cibo-nome', cibo.nome));
+        info.appendChild(el('div', 'petq-cibo-effetti', descriviCibo(cibo) + ' — ' + cibo.costo + ' monete'));
+        riga.appendChild(info);
+
+        var btn = el('button', 'petq-btn petq-btn-mini', 'Compra');
+        if ((currentState.coins || 0) < cibo.costo) {
+          btn.disabled = true;
+          btn.title = 'Monete insufficienti.';
+        }
+        btn.addEventListener('click', function () { eseguiAcquisto(cibo, riga); });
+        riga.appendChild(btn);
+
+        lista.appendChild(riga);
+      })(cibi[i]);
+    }
+    wrap.appendChild(lista);
+    return wrap;
+  }
+
+  // Compra 1 porzione del cibo: scala le monete, incrementa la qty in dispensa (o crea la
+  // riga se il pet non ne aveva). Ripetibile a piacere finché ci sono monete.
+  function eseguiAcquisto(cibo, rigaEl) {
+    if (!currentState) return;
+    if ((currentState.coins || 0) < cibo.costo) {
+      shakeCard(rigaEl);
+      mostraToast('Monete insufficienti.');
+      return;
+    }
+    currentState.coins -= cibo.costo;
+    if (!Array.isArray(currentState.dispensa)) currentState.dispensa = [];
+    var voce = null;
+    for (var i = 0; i < currentState.dispensa.length; i++) {
+      if (currentState.dispensa[i].nome === cibo.nome) { voce = currentState.dispensa[i]; break; }
+    }
+    if (voce) {
+      voce.qty = (voce.qty || 0) + 1;
+    } else {
+      currentState.dispensa.push({ nome: cibo.nome, qty: 1 });
+    }
+    PETQ.save.save(currentState);
+    aggiornaHud(currentState);
+    aggiornaDettaglioMappa(statoMappa());
+    mostraToast(cibo.nome + ' comprato: ora è nel frigo.');
+  }
+
   function coordMappa(canvas, clientX, clientY) {
     var r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return { x: -1, y: -1 };
@@ -1964,6 +2098,12 @@ window.PETQ = window.PETQ || {};
     return null;
   }
 
+  // hit-test sul pin shop (SEMPRE tappabile, GDD: "sempre accessibile", distinto dalla rosa)
+  function hitShopPin(p) {
+    var rect = PETQ.rooms && PETQ.rooms._shopPin;
+    return !!(rect && dentroRect(p, rect, 3));
+  }
+
   function installaPointerMappa(canvas) {
     canvas.addEventListener('pointerdown', function (e) {
       mapPointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -1976,10 +2116,25 @@ window.PETQ = window.PETQ || {};
       mapPointer = null;
       if (annullato || Math.sqrt(dx * dx + dy * dy) > 12) return; // non era un tap
 
-      var sm = statoMappa();
-      if (sm.inCorso) return; // nessun pin tappabile durante la missione
-
       var p = coordMappa(canvas, e.clientX, e.clientY);
+
+      // shop: sempre tappabile (anche a missione in corso o rosa esaurita), niente a che
+      // vedere col motore missioni. Tap fuori dal pin mentre il negozio e' aperto lo chiude.
+      if (hitShopPin(p)) {
+        negozioSelezionato = true;
+        missioneSelezionata = null;
+        aggiornaDettaglioMappa(statoMappa());
+        return;
+      }
+      if (negozioSelezionato) {
+        negozioSelezionato = false;
+        aggiornaDettaglioMappa(statoMappa());
+        return;
+      }
+
+      var sm = statoMappa();
+      if (sm.inCorso) return; // nessun pin missione tappabile durante la missione
+
       missioneSelezionata = hitPin(p, sm.attivi); // pin -> seleziona/cambia; fuori -> null = chiude
       ridisegnaMappa();
       aggiornaDettaglioMappa(sm);
@@ -2356,7 +2511,10 @@ window.PETQ = window.PETQ || {};
 
     // Debug "Nuovo giorno" (fix playtest, limite 1 missione/giorno): azzera tutti i contatori
     // giornalieri e fa scattare il dailyLogin, cosi' si puo' testare il reset senza aspettare
-    // la mezzanotte reale.
+    // la mezzanotte reale. Il debug non puo' spostare la data REALE del sistema (oggiStr() la
+    // legge da new Date()), quindi per testare il cooldown missioni (3 giorni, date assolute)
+    // retrodatiamo di 1 giorno ogni voce di state.missioniFatte: dopo 3 click una missione
+    // completata "oggi" risulta come completata 3 giorni fa e rientra nella rosa.
     var nuovoGiornoBtn = el('button', 'petq-btn petq-btn-mini', 'Nuovo giorno');
     nuovoGiornoBtn.addEventListener('click', function () {
       if (!currentState) return;
@@ -2369,6 +2527,7 @@ window.PETQ = window.PETQ || {};
       currentState.cureOggi = 0;
       currentState.categoriePastiOggi = [];
       currentState.lastLoginDay = null;
+      retrodataCooldownMissioni(currentState, 1);
       if (PETQ.care && PETQ.care.dailyLogin) PETQ.care.dailyLogin(currentState);
       PETQ.save.save(currentState);
       aggiornaHud(currentState);
@@ -2394,6 +2553,27 @@ window.PETQ = window.PETQ || {};
     });
     panel.appendChild(forzaNannaBtn);
 
+    // Debug "Salta sonno" (fix orologio di gioco, questa sessione): completa IMMEDIATAMENTE
+    // il sonno in corso come se avesse dormito la sua durata massima (riposino 2h piene /
+    // notturno 8h piene), utile per testare il risveglio autonomo senza aspettare l'orologio
+    // di gioco anche a velocita' ×600.
+    var saltaSonnoBtn = el('button', 'petq-btn petq-btn-mini', 'Salta sonno');
+    saltaSonnoBtn.addEventListener('click', function () {
+      if (!currentState || !PETQ.pet) return;
+      if (!currentState.sonno) {
+        mostraToast('Non sta dormendo.');
+        return;
+      }
+      var risultato = PETQ.pet.debugSaltaAlMattino(currentState);
+      PETQ.save.save(currentState);
+      disegnaStanzaEPet(currentState);
+      aggiornaHud(currentState);
+      renderAzioni();
+      if (risultato) mostraBalloon(PETQ.dialog.say(currentState.pet, risultato.battuta, currentState));
+      mostraToast('Sonno completato.');
+    });
+    panel.appendChild(saltaSonnoBtn);
+
     // Debug "Ferite +20" (fix playtest 7c): per testare il flusso infermeria senza aspettare
     // un fallimento missione.
     var feriteBtn = el('button', 'petq-btn petq-btn-mini', 'Ferite +20');
@@ -2406,6 +2586,20 @@ window.PETQ = window.PETQ || {};
       renderAzioni();
     });
     panel.appendChild(feriteBtn);
+
+    // Debug "Insegna parola test" (GDD "Parola imparata", punto 4): inserisce direttamente
+    // "banana" in state.parole, bypassando il limite di 1 al giorno di care.teachWord, cosi'
+    // si puo' verificare subito che {parola} compaia nelle battute senza aspettare il giorno
+    // dopo. Non tocca wordDay: l'insegnamento "vero" del giorno resta comunque disponibile.
+    var parolaTestBtn = el('button', 'petq-btn petq-btn-mini', 'Insegna parola test');
+    parolaTestBtn.addEventListener('click', function () {
+      if (!currentState) return;
+      if (!Array.isArray(currentState.parole)) currentState.parole = [];
+      if (currentState.parole.indexOf('banana') === -1) currentState.parole.push('banana');
+      PETQ.save.save(currentState);
+      mostraToast('Parola di test inserita: banana.');
+    });
+    panel.appendChild(parolaTestBtn);
 
     var resetBtn = el('button', 'petq-btn petq-btn-mini petq-btn-danger', 'Reset save');
     resetBtn.addEventListener('click', function () {

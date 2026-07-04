@@ -15,15 +15,21 @@ window.PETQ = window.PETQ || {};
   var PERSONALITA_LIST = ['gentile', 'maleducato', 'nerd', 'sportivo'];
   var SOTTORAZZE_ALIENO = ['blob', 'insettoide', 'rettiliano'];
 
+  // Numeri da content/bilanciamento.md sezione "Energia e sonno" (v1 confermato dal
+  // fondatore, 4 lug 2026): riposino (prima delle 21) e sonno notturno (dalle 21) sono due
+  // modalita' della stessa azione "dormire", vedi avviaSonno/risolviRisveglio sotto.
   var DEFAULT_ENERGIA_SONNO = {
-    decadimento: 4,
+    decadimento: 2,
     costoMissionePerOra: 8,
     costoAllenamento: 10,
     sogliaRifiuto: 20,
     oraLetto: 21,
     oraCrollo: 23,
-    sveglioAutonomoOre: 8,
-    sonnoMinimoOre: 6,
+    riposinoDurataMax: 2,
+    riposinoDurataMin: 1,
+    riposinoRecuperoOra: 15,
+    sveglioAutonomoOre: 8,     // durata max sonno notturno / sveglia autonoma
+    sonnoMinimoOre: 5,         // sonno notturno: minimo di gioco prima di poter svegliare
     risveglioBuono: 100,
     risveglioCattivo: 70
   };
@@ -143,11 +149,22 @@ window.PETQ = window.PETQ || {};
       return;
     }
 
+    // Orologio di gioco (fix "sonno + orologio"): avanza SEMPRE con lo stesso delta usato
+    // per il decadimento, sonno o non sonno, cosi' il debug ×60/×600 accelera anche l'ora
+    // di gioco e si puo' effettivamente arrivare alle 21/23 per testare il ciclo sonno.
+    // V. clock.js avanzaOrologio per i dettagli su wrap/migrazione.
+    if (state && PETQ.clock && PETQ.clock.avanzaOrologio) {
+      PETQ.clock.avanzaOrologio(state, gameHours);
+    }
+
     // Sonno (GDD "Energia e sonno"): mentre il pet dorme TUTTE le stat sono in pausa,
     // niente decadimento di sorta (stessa regola della "notte" gia' esistente in clock.js,
     // qui estesa esplicitamente al ciclo sonno del pet). Il risveglio lo gestisce
     // controllaSonno/completaSonno, chiamato separatamente dal tick (v. main.js/ui.js).
+    // Le "ore dormite" si accumulano qui in ore di GIOCO (stesso delta dell'orologio sopra),
+    // non ore reali: cosi' anche il sonno risente del moltiplicatore debug.
     if (state && state.sonno) {
+      state.sonno.oreDormite = (state.sonno.oreDormite || 0) + gameHours;
       return;
     }
 
@@ -283,7 +300,15 @@ window.PETQ = window.PETQ || {};
     state.ferite = clamp(state.ferite - 5, 0, 100);
   }
 
-  // regole soglie da config: media fame bassa -> magro; >5 pasti/giorno o >3 dolci -> ciccione
+  // Soglia sovralimentazioni recenti che attiva la variante ciccione (bilanciamento.md
+  // "Soglie" -> "Variante ciccione", aggiunta fondatore): 2 pasti dati a Fame gia' >= 90
+  // contano quanto ">5 pasti/giorno" o ">3 dolci/giorno". Il contatore e' incrementato da
+  // care.feed (pet.sovralimentazioniRecenti) e non viene mai azzerato nel prototipo (e' un
+  // segnale cumulativo "quante volte hai strafatto", non un contatore giornaliero).
+  var SOGLIA_SOVRALIMENTAZIONI_CICCIONE = 2;
+
+  // regole soglie da config: media fame bassa -> magro; >5 pasti/giorno, >3 dolci o
+  // sovralimentazioni ripetute -> ciccione
   function bodyVariant(pet) {
     if (!pet) return 'normale';
     var bil = bilanciamento();
@@ -297,7 +322,10 @@ window.PETQ = window.PETQ || {};
       if (pastiOggi[i] && pastiOggi[i].categoria === 'dolce') dolciOggi++;
     }
 
-    if (pastiOggi.length > 5 || dolciOggi > 3) return 'ciccione';
+    if (pastiOggi.length > 5 || dolciOggi > 3 ||
+        (pet.sovralimentazioniRecenti || 0) >= SOGLIA_SOVRALIMENTAZIONI_CICCIONE) {
+      return 'ciccione';
+    }
 
     var mediaFame = pet.stats ? pet.stats.fame : 100;
     if (mediaFame < soglieMagro && (pastiOggi.length + pastiIeri.length) < 2) return 'magro';
@@ -307,14 +335,16 @@ window.PETQ = window.PETQ || {};
   }
 
   // ==================== Energia e sonno (GDD "Energia e sonno") ====================
-  // state.sonno = null | { inizio: msEpoch, aLetto: bool }. Mentre dorme, applyDecay()
-  // sopra salta ogni decadimento (tutte le stat in pausa, come da GDD). Le funzioni qui
-  // sotto gestiscono l'intero ciclo: avvio (letto o crollo), controllo scadenza (sveglia
-  // autonoma a 8h / crollo automatico alle 23), risveglio manuale o automatico.
-
-  function oraLocale(d) {
-    return (d || new Date()).getHours();
-  }
+  // state.sonno = null | { modalita: 'riposino'|'notturno', aLetto: bool, oreDormite: number }.
+  // "Dormire" e' un unico gesto (drag sul letto) con due modalita' a seconda dell'OROLOGIO DI
+  // GIOCO (state.gameMinutes, v. clock.js) al momento del drag: prima delle 21 -> riposino
+  // (max 2h, +15 Energia/ora); dalle 21 -> sonno notturno (max 8h, Energia 100 al risveglio
+  // pieno). Il crollo automatico (chi non va a letto entro le 23) e' sempre notturno.
+  // Mentre dorme, applyDecay() sopra salta il decadimento delle stat MA accumula
+  // state.sonno.oreDormite in ore di GIOCO (stesso delta del debug ×60/×600, cosi' anche il
+  // sonno e' accelerabile). Le funzioni qui sotto gestiscono l'intero ciclo: avvio
+  // (letto o crollo), controllo scadenza (sveglia autonoma / crollo automatico), risveglio
+  // manuale o automatico.
 
   // true se il pet puo' rifiutare missione/allenamento per energia bassa (GDD: soglia 20)
   function energiaSottoSoglia(pet) {
@@ -323,22 +353,35 @@ window.PETQ = window.PETQ || {};
     return pet.stats.energia < es.sogliaRifiuto;
   }
 
-  // Avvia il sonno: aLetto=true se portato a letto dal giocatore (drag, dalle 21),
-  // aLetto=false se crollo automatico (alle 23, sul posto). Non sovrascrive un sonno gia' in corso.
+  // Modalita' di sonno in base all'orologio DI GIOCO al momento del drag (GDD: prima delle
+  // 21 -> riposino, dalle 21 -> notturno). Esposta per la UI (per decidere quale hint/testo
+  // mostrare prima ancora di avviare il sonno).
+  function modalitaSonnoOra(state) {
+    var es = bilEnergiaSonno();
+    var og = PETQ.clock ? PETQ.clock.oraGioco(state) : { ore: 0 };
+    return (og.ore >= es.oraLetto) ? 'notturno' : 'riposino';
+  }
+
+  // Avvia il sonno: aLetto=true se portato a letto dal giocatore (drag), aLetto=false se
+  // crollo automatico (alle 23, sul posto). La modalita' (riposino/notturno) si decide qui
+  // in base all'orologio di gioco corrente: il crollo e' sempre notturno (e' un crollo
+  // serale, non un pisolino). Non sovrascrive un sonno gia' in corso.
   function avviaSonno(state, aLetto) {
     if (!state || state.sonno) return false;
-    state.sonno = { inizio: Date.now(), aLetto: !!aLetto };
+    var modalita = aLetto ? modalitaSonnoOra(state) : 'notturno';
+    state.sonno = { modalita: modalita, aLetto: !!aLetto, oreDormite: 0 };
     return true;
   }
 
-  // Crollo automatico (GDD): alle 23 (ora locale), se il pet e' sveglio e non in missione,
-  // si addormenta sul posto (aLetto:false) senza intervento del giocatore. Va richiamata dal
-  // tick di gioco (pattern controllaMissioneScaduta in ui.js: chiamata periodica, idempotente
-  // perche' avviaSonno non fa nulla se state.sonno e' gia' impostato).
+  // Crollo automatico (GDD): quando l'orologio DI GIOCO raggiunge le 23, se il pet e' sveglio
+  // e non in missione, si addormenta sul posto (aLetto:false) senza intervento del giocatore.
+  // Va richiamata dal tick di gioco (pattern controllaMissioneScaduta in ui.js: chiamata
+  // periodica, idempotente perche' avviaSonno non fa nulla se state.sonno e' gia' impostato).
   function controllaCrolloAutomatico(state) {
     if (!state || state.sonno || state.missione) return false;
     var es = bilEnergiaSonno();
-    if (oraLocale() >= es.oraCrollo) {
+    var og = PETQ.clock ? PETQ.clock.oraGioco(state) : { ore: 0 };
+    if (og.ore >= es.oraCrollo) {
       return avviaSonno(state, false);
     }
     return false;
@@ -348,21 +391,35 @@ window.PETQ = window.PETQ || {};
   // (battuta da mostrare: 'sveglia' se dormito bene, 'dormito_male' altrimenti).
   function risolviRisveglio(state, oreDormite, manuale) {
     var es = bilEnergiaSonno();
-    var sonno = state.sonno || { aLetto: false };
+    var sonno = state.sonno || { modalita: 'notturno', aLetto: false };
+    var energiaPre = (state.pet && typeof state.pet.stats.energia === 'number') ? state.pet.stats.energia : 0;
     var energiaFinale;
     var battuta;
 
-    if (sonno.aLetto && oreDormite >= es.sonnoMinimoOre) {
-      energiaFinale = es.risveglioBuono;
-      battuta = 'sveglia';
-    } else if (!sonno.aLetto) {
+    if (!sonno.aLetto) {
+      // crollato sul posto (mai andato a letto entro le 23): dormita scomoda, sempre lo
+      // stesso esito indipendentemente da quanto e' durata (GDD: Energia 70).
       energiaFinale = es.risveglioCattivo;
       battuta = 'dormito_male';
+    } else if (sonno.modalita === 'riposino') {
+      // riposino: +15 Energia/ora dormita fino al cap di durata (2h piene = +30), qualunque
+      // sia il momento della sveglia (non c'e' "soglia minima" per l'esito, solo per il
+      // TASTO sveglia - v. eseguiSveglia in ui.js che blocca il tap prima di riposinoDurataMin).
+      var oreEff = Math.min(oreDormite, es.riposinoDurataMax);
+      energiaFinale = energiaPre + es.riposinoRecuperoOra * oreEff;
+      battuta = (oreDormite >= es.riposinoDurataMax) ? 'sveglia' : 'dormito_male';
+    } else if (oreDormite >= es.sonnoMinimoOre) {
+      // sonno notturno, dormito almeno il minimo: energia piena (o proporzionale se
+      // svegliato dopo il minimo ma prima del pieno di 8h)
+      var frazioneNotte = Math.min(1, oreDormite / es.sveglioAutonomoOre);
+      energiaFinale = Math.max(energiaPre, Math.round(es.risveglioBuono * frazioneNotte));
+      battuta = 'sveglia';
     } else {
-      // a letto ma svegliato manualmente prima della soglia minima: proporzionale, min 30
-      // (GDD: "svegliato prima delle 6h -> proporzionale 100*ore/6, min 30")
-      var proporzionale = Math.round(100 * (oreDormite / es.sonnoMinimoOre));
-      energiaFinale = Math.max(30, Math.min(100, proporzionale));
+      // notturno svegliato prima del minimo (non dovrebbe accadere: il tasto Sveglia lo
+      // blocca in ui.js, ma il debug "salta sonno" e altri automatismi possono comunque
+      // arrivare qui): proporzionale alle ore dormite, mai sotto l'energia pre-sonno.
+      var proporzionale = Math.round(es.risveglioBuono * (oreDormite / es.sonnoMinimoOre));
+      energiaFinale = Math.max(energiaPre, proporzionale);
       battuta = 'dormito_male';
     }
 
@@ -375,34 +432,51 @@ window.PETQ = window.PETQ || {};
     return { ok: true, energia: energiaFinale, oreDormite: oreDormite, battuta: battuta, manuale: !!manuale };
   }
 
-  // Sveglia autonoma: controlla se sono passate >=8h dall'inizio del sonno e in tal caso
-  // completa il risveglio automaticamente. Va richiamata dal tick/boot (pattern
-  // controllaMissioneScaduta). Ritorna il risultato di risolviRisveglio oppure null se non e'
-  // ancora ora.
+  // Sveglia autonoma: controlla se il sonno ha raggiunto la sua durata massima (riposino:
+  // riposinoDurataMax; notturno: sveglioAutonomoOre) e in tal caso completa il risveglio
+  // automaticamente. Va richiamata dal tick/boot (pattern controllaMissioneScaduta).
+  // Ritorna il risultato di risolviRisveglio oppure null se non e' ancora ora.
   function controllaSveglia(state) {
     if (!state || !state.sonno) return null;
     var es = bilEnergiaSonno();
-    var oreDormite = (Date.now() - state.sonno.inizio) / 3600000;
-    if (oreDormite >= es.sveglioAutonomoOre) {
+    var oreDormite = state.sonno.oreDormite || 0;
+    var durataMax = (state.sonno.modalita === 'riposino') ? es.riposinoDurataMax : es.sveglioAutonomoOre;
+    if (oreDormite >= durataMax) {
       return risolviRisveglio(state, oreDormite, false);
     }
     return null;
   }
 
-  // Sveglia manuale (tap del giocatore mentre dorme): sempre permessa, l'energia dipende
-  // da quante ore ha dormito (v. risolviRisveglio). Ritorna null se non stava dormendo.
+  // Sveglia manuale (tap/bottone del giocatore mentre dorme): l'energia dipende da quante
+  // ore ha dormito (v. risolviRisveglio). Il rispetto dei minimi (riposino 1h, notturno 5h)
+  // e' responsabilita' del chiamante (ui.js puoSvegliare/eseguiSveglia): questa funzione
+  // esegue sempre la sveglia se richiamata. Ritorna null se non stava dormendo.
   function svegliaManuale(state) {
     if (!state || !state.sonno) return null;
-    var oreDormite = (Date.now() - state.sonno.inizio) / 3600000;
+    var oreDormite = state.sonno.oreDormite || 0;
     return risolviRisveglio(state, oreDormite, true);
   }
 
-  // Debug: "Salta al mattino" completa il sonno come se avesse dormito 8 ore piene
-  // (sveglia autonoma), qualunque sia l'ora reale di inizio.
+  // Puo' il giocatore svegliare ORA il pet col tasto Sveglia? (GDD: riposino non svegliabile
+  // prima di 1h di gioco dormita, notturno prima di 5h). Ritorna {puo:bool, minutiMancanti}.
+  function puoSvegliare(state) {
+    if (!state || !state.sonno) return { puo: false, minutiMancanti: 0 };
+    var es = bilEnergiaSonno();
+    var oreDormite = state.sonno.oreDormite || 0;
+    var minimo = (state.sonno.modalita === 'riposino') ? es.riposinoDurataMin : es.sonnoMinimoOre;
+    if (oreDormite >= minimo) return { puo: true, minutiMancanti: 0 };
+    var mancanti = Math.max(0, Math.ceil((minimo - oreDormite) * 60));
+    return { puo: false, minutiMancanti: mancanti };
+  }
+
+  // Debug: "Salta sonno" completa il sonno corrente come se avesse dormito la sua durata
+  // massima (riposino: 2h piene; notturno: 8h piene / sveglia autonoma), qualunque sia
+  // l'orologio di gioco al momento dell'avvio. Se non sta dormendo non fa nulla.
   function debugSaltaAlMattino(state) {
     if (!state || !state.sonno) return null;
     var es = bilEnergiaSonno();
-    return risolviRisveglio(state, es.sveglioAutonomoOre, false);
+    var durataMax = (state.sonno.modalita === 'riposino') ? es.riposinoDurataMax : es.sveglioAutonomoOre;
+    return risolviRisveglio(state, durataMax, false);
   }
 
   window.PETQ.pet = {
@@ -413,10 +487,12 @@ window.PETQ = window.PETQ || {};
     guarisciGiorno: guarisciGiorno,
     bilEnergiaSonno: bilEnergiaSonno,
     energiaSottoSoglia: energiaSottoSoglia,
+    modalitaSonnoOra: modalitaSonnoOra,
     avviaSonno: avviaSonno,
     controllaCrolloAutomatico: controllaCrolloAutomatico,
     controllaSveglia: controllaSveglia,
     svegliaManuale: svegliaManuale,
+    puoSvegliare: puoSvegliare,
     debugSaltaAlMattino: debugSaltaAlMattino,
     _risolviRisveglio: risolviRisveglio
   };

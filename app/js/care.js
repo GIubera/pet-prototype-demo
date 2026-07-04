@@ -8,7 +8,7 @@ window.PETQ = window.PETQ || {};
     console.warn('PETQ.care: bilanciamento non disponibile, uso default locali');
     return {
       decadimento: { fame: 6, igiene: 8, felicita: 2 },
-      soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
+      soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40, sovralimentazione: 90 },
       economia: { login: 10, monetePartenza: 50 },
       allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
       iniziali: { benessere: 70, base: 5, firma: 3 }
@@ -26,15 +26,48 @@ window.PETQ = window.PETQ || {};
     return d.getFullYear() + '-' + mese + '-' + giorno;
   }
 
+  // Inventario/frigo (GDD "Economia" -> "Spesa e dispensa"): state.dispensa e' un array di
+  // {nome, qty}. Decrementa di 1 la qty del cibo indicato; se arriva a 0 la voce sparisce
+  // dal frigo. Ritorna true se ha trovato e consumato una porzione, false altrimenti (frigo
+  // vuoto per quel cibo: il chiamante decide come reagire, v. feed sotto).
+  function consumaDaDispensa(state, nomeCibo) {
+    if (!state || !Array.isArray(state.dispensa)) return false;
+    for (var i = 0; i < state.dispensa.length; i++) {
+      if (state.dispensa[i].nome === nomeCibo) {
+        state.dispensa[i].qty = (state.dispensa[i].qty || 0) - 1;
+        if (state.dispensa[i].qty <= 0) state.dispensa.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Soglia sovralimentazione (bilanciamento.md "Soglie"): dare da mangiare quando la Fame e'
+  // GIA' ALTA (>= 90) e' "mangiare troppo": contribuisce alla variante ciccione (v. pet.js
+  // bodyVariant, contatore state.pet.sovralimentazioniRecenti) e infligge +10 Ferite (sistema
+  // Ferite esistente, stesso meccanismo dei danni missione). ECCEZIONE: il baby non ne risente
+  // (ne' ciccione ne' ferite) — decisione fondatore, il baby non ingrassa e non si ammala cosi'.
+  var SOGLIA_SOVRALIMENTAZIONE_DEFAULT = 90;
+  var FERITE_SOVRALIMENTAZIONE = 10;
+
+  function sogliaSovralimentazione() {
+    var bil = bilanciamento();
+    var v = bil.soglie && bil.soglie.sovralimentazione;
+    return (typeof v === 'number') ? v : SOGLIA_SOVRALIMENTAZIONE_DEFAULT;
+  }
+
+  // Feed: il pagamento avviene allo SHOP (GDD "Spesa e dispensa"), non qui. feed() consuma
+  // 1 porzione dall'inventario (state.dispensa) e applica gli effetti; niente scalo monete.
+  // cibo = {nome, categoria, fame, stat, statNome} (v. content.js parseCibi / ciboFallback in ui.js).
   function feed(state, cibo) {
     if (!state || !state.pet || !cibo) return { ok: false, msg: 'errore interno' };
 
-    if (state.coins < cibo.costo) {
-      return { ok: false, msg: 'Monete insufficienti.' };
+    if (!consumaDaDispensa(state, cibo.nome)) {
+      return { ok: false, msg: 'Non ne hai in frigo: compralo al Market.' };
     }
 
-    state.coins -= cibo.costo;
     var pet = state.pet;
+    var famePrima = pet.stats.fame;
     pet.stats.fame = clamp(pet.stats.fame + (cibo.fame || 0), 0, 100);
 
     // Pacing stat RPG (bilanciamento.md): il bonus stat del cibo scatta solo per il PRIMO
@@ -58,9 +91,19 @@ window.PETQ = window.PETQ || {};
       digestioneOre: 1 + PETQ.rng.rand() * 0.5
     });
 
+    // Sovralimentazione (bilanciamento.md "Soglie"): scatta se la Fame era GIA' >= soglia
+    // PRIMA di questo pasto (mangiare quando si e' gia' pieni), mai per il baby.
+    var eBaby = pet.stadio === 'baby';
+    var sovralimentato = !eBaby && famePrima >= sogliaSovralimentazione();
+    if (sovralimentato) {
+      pet.sovralimentazioniRecenti = (pet.sovralimentazioniRecenti || 0) + 1;
+      state.ferite = clamp((state.ferite || 0) + FERITE_SOVRALIMENTAZIONE, 0, 100);
+    }
+
     PETQ.pet.recomputeSalute(pet, state);
 
-    return { ok: true, msg: (pet.nome || 'Il pet') + ' ha mangiato: ' + cibo.nome + '.' };
+    var msg = (pet.nome || 'Il pet') + ' ha mangiato: ' + cibo.nome + '.';
+    return { ok: true, msg: msg, sovralimentato: sovralimentato };
   }
 
   function wash(state) {
@@ -101,6 +144,15 @@ window.PETQ = window.PETQ || {};
     return { ok: true, msg: 'Coccola fatta.' };
   }
 
+  // Durata allenamento (bilanciamento.md "Allenamento", playtest 4 lug 2026): non e' piu'
+  // istantaneo, "dura" 90 minuti di gioco. L'orologio di gioco avanza di 1.5h e il decadimento
+  // normale (fame/igiene/felicita'/energia, spawn bisogni, malus condizioni) si applica per
+  // quell'intervallo, esattamente come una piccola missione domestica — v. PETQ.pet.applyDecay
+  // (che gia' include l'avanzamento orologio, v. clock.js avanzaOrologio). Se l'avanzamento fa
+  // scattare un nuovo giorno o l'ora del crollo/sonno, applyDecay/controllaCrolloAutomatico lo
+  // gestiscono con lo stesso meccanismo del tick normale (chiamato da ui.js dopoAzione).
+  var DURATA_ALLENAMENTO_ORE = 1.5;
+
   function train(state, statNome) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
     if (state.sonno) {
@@ -130,7 +182,15 @@ window.PETQ = window.PETQ || {};
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + felicitaBonus, 0, 100);
     state.pet.stats.energia = clamp(state.pet.stats.energia - es.costoAllenamento, 0, 100);
     state.trainDay = oggi;
-    PETQ.pet.recomputeSalute(state.pet, state);
+
+    // Avanza l'orologio di gioco di 90 minuti e applica il decadimento normale per
+    // quell'intervallo (fame/igiene/felicita'/energia calano come per il tempo passato in
+    // una missione breve). applyDecay chiama gia' recomputeSalute al suo interno.
+    if (PETQ.pet.applyDecay) {
+      PETQ.pet.applyDecay(state.pet, DURATA_ALLENAMENTO_ORE, state);
+    } else {
+      PETQ.pet.recomputeSalute(state.pet, state);
+    }
 
     return { ok: true, msg: 'Allenamento completato: +' + effetto + ' ' + statNome + '.' };
   }
@@ -235,7 +295,11 @@ window.PETQ = window.PETQ || {};
     train: train,
     teachWord: teachWord,
     dailyLogin: dailyLogin,
-    cura: cura
+    cura: cura,
+    _consumaDaDispensa: consumaDaDispensa,
+    _sogliaSovralimentazione: sogliaSovralimentazione,
+    _feriteSovralimentazione: FERITE_SOVRALIMENTAZIONE,
+    _durataAllenamentoOre: DURATA_ALLENAMENTO_ORE
   };
 
 })();

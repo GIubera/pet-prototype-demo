@@ -234,6 +234,13 @@ window.PETQ = window.PETQ || {};
   var LETTO_LAB_CAMERA = { x: 14, y: 20, w: 40, h: 30 };
   var LETTO_SHIP_CAMERA = { x: 14, y: 18, w: 40, h: 32 };
 
+  // Frigo in cucina (GDD "Economia" -> "Spesa e dispensa"): hotzone tap sul frigo/capsula
+  // criogenica gia' disegnati da labCucina/shipCucina, coordinate del rettangolo del mobile
+  // (con un margine generoso applicato dalla UI in fase di hit-test, stesso pattern hotzone
+  // vasca/letto). Esposta come _frigoZona per tema cosi' ui.js puo' fare hit-test sul tap.
+  var FRIGO_LAB_CUCINA = { x: 6, y: 12, w: 16, h: 32 };
+  var FRIGO_SHIP_CUCINA = { x: 6, y: 10, w: 16, h: 34 };
+
   function labCameraLetto(g) {
     var r = LETTO_LAB_CAMERA;
     // gambe/base capsula
@@ -473,7 +480,7 @@ window.PETQ = window.PETQ || {};
     dimMuro: "#3a4058", dimScuro: "#323952", dimChiaro: "#484f6c", dimFinestra: "#383f58"
   };
 
-  // rettangoli logici dei 9 luoghi (hit-test per la UI, generosi, min 16x14)
+  // rettangoli logici dei 9 luoghi missione (hit-test per la UI, generosi, min 16x14)
   var MAPPA_PINS = {
     m2: { x: 2,   y: 4,  w: 32, h: 36 }, // Parco delle Antenne
     m4: { x: 38,  y: 6,  w: 26, h: 34 }, // Biblioteca dei Bit Perduti
@@ -485,6 +492,15 @@ window.PETQ = window.PETQ || {};
     m8: { x: 2,   y: 98, w: 62, h: 26 }, // Neon Avenue
     m7: { x: 84,  y: 98, w: 34, h: 26 }  // Fogne / Laboratorio Abbandonato
   };
+
+  // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): pin FISSO e SEMPRE illuminato, distinto
+  // dalla rosa a rotazione delle missioni (occupa lo spazio libero tra Neon Avenue e le Fogne,
+  // sotto la strada verticale). Tap -> menu acquisto (ui.js), non una missione: nessuna
+  // scheda in content/missioni.md, nessun id 'm*'. Chiave separata da MAPPA_PINS/LUOGHI cosi'
+  // il resto del codice (rosaDelGiorno, statoMappa, hitPin sui soli 'attivi') non lo confonde
+  // mai con un luogo missione.
+  var SHOP_PIN_ID = 'shop';
+  var MAPPA_PIN_SHOP = { x: 64, y: 100, w: 20, h: 24 };
 
   // pin a goccia gialla sopra un luogo; bright = frame di pulsazione
   function mapPin(g, cx, tipY, bright) {
@@ -678,6 +694,26 @@ window.PETQ = window.PETQ || {};
     }
   }
 
+  // Shop cibo "Market" (GDD "Economia" -> "Spesa e dispensa"): tettoia a righe verde/crema,
+  // cassette di frutta colorate in vetrina, insegna sempre accesa. SEMPRE illuminato (nessun
+  // parametro "on": a differenza dei luoghi missione non fa mai parte della rosa spenta),
+  // silhouette diversa dal Negozio di Giocattoli (m0, tenda rosso/crema) per non confondersi.
+  function luogoShop(g) {
+    var r = MAPPA_PIN_SHOP;
+    O(g, r.x, r.y + 6, r.w, r.h - 6, "#0e1118", "#e8dfc4"); // corpo edificio
+    R(g, r.x + 1, r.y + 1, r.w - 2, 5, "#3f9c5c"); // tettoia verde
+    R(g, r.x + 1, r.y + 5, r.w - 2, 1, "#2c7a44");
+    for (var i = 0; i < r.w - 2; i += 4) R(g, r.x + 1 + i, r.y + 1, 2, 5, "#5cc47f"); // righe tenda
+    R(g, r.x + 3, r.y + 9, r.w - 6, 3, "#f8e05a"); // insegna gialla
+    // vetrina con cassette di frutta colorate
+    R(g, r.x + 3, r.y + 13, r.w - 6, 8, "#2e3a2c");
+    R(g, r.x + 4, r.y + 14, 4, 3, "#e85a5a"); // mele
+    R(g, r.x + 9, r.y + 14, 4, 3, "#f0b84a"); // arance
+    R(g, r.x + 14, r.y + 15, 3, 2, "#5ce87f"); // insalata
+    // porta
+    R(g, r.x + 7, r.y + 21, 6, 3, "#5c3a1e");
+  }
+
   var LUOGHI = {
     m0: luogoNegozio, m1: luogoSalaGiochi, m2: luogoParco, m3: luogoDojo, m4: luogoBiblioteca,
     m5: luogoIndustria, m6: luogoStudioTV, m7: luogoFogne, m8: luogoNeonAvenue
@@ -788,6 +824,12 @@ window.PETQ = window.PETQ || {};
       var on = attivi.indexOf(id) >= 0 || stato.inCorso === id;
       LUOGHI[id](g, on);
     }
+    // Shop cibo: SEMPRE disegnato illuminato (non fa parte della rosa a rotazione, v.
+    // MAPPA_PIN_SHOP), con pin proprio sempre visibile (nessun frame di pulsazione: non e'
+    // mai "in corso" come una missione).
+    luogoShop(g);
+    mapPin(g, pinCx(MAPPA_PIN_SHOP), pinTipY(MAPPA_PIN_SHOP), false);
+
     // pin sopra i luoghi attivi; quello in corso pulsa su 2 frame
     for (id in LUOGHI) {
       if (!Object.prototype.hasOwnProperty.call(LUOGHI, id)) continue;
@@ -805,12 +847,19 @@ window.PETQ = window.PETQ || {};
 
   // assert di sviluppo: rettangoli dentro il canvas, dimensioni minime, niente sovrapposizioni (luoghi e pin)
   function assertMappa() {
+    var tuttiIPin = {};
+    var idL;
+    for (idL in MAPPA_PINS) {
+      if (Object.prototype.hasOwnProperty.call(MAPPA_PINS, idL)) tuttiIPin[idL] = MAPPA_PINS[idL];
+    }
+    tuttiIPin[SHOP_PIN_ID] = MAPPA_PIN_SHOP; // pin permanente shop, stesso check dei luoghi missione
+
     var ids = [];
     var id;
-    for (id in MAPPA_PINS) {
-      if (!Object.prototype.hasOwnProperty.call(MAPPA_PINS, id)) continue;
+    for (id in tuttiIPin) {
+      if (!Object.prototype.hasOwnProperty.call(tuttiIPin, id)) continue;
       ids.push(id);
-      var r = MAPPA_PINS[id];
+      var r = tuttiIPin[id];
       if (r.x < 0 || r.y < 0 || r.x + r.w > MAPPA_W || r.y + r.h > MAPPA_H) {
         console.error("PETQ.rooms: _mappaPins." + id + " esce dal canvas " + MAPPA_W + "x" + MAPPA_H);
       }
@@ -827,10 +876,10 @@ window.PETQ = window.PETQ || {};
     }
     for (var i = 0; i < ids.length; i++) {
       for (var j = i + 1; j < ids.length; j++) {
-        if (overlap(MAPPA_PINS[ids[i]], MAPPA_PINS[ids[j]])) {
+        if (overlap(tuttiIPin[ids[i]], tuttiIPin[ids[j]])) {
           console.error("PETQ.rooms: luoghi sovrapposti " + ids[i] + " / " + ids[j]);
         }
-        if (overlap(pinBox(MAPPA_PINS[ids[i]]), pinBox(MAPPA_PINS[ids[j]]))) {
+        if (overlap(pinBox(tuttiIPin[ids[i]]), pinBox(tuttiIPin[ids[j]]))) {
           console.error("PETQ.rooms: pin sovrapposti " + ids[i] + " / " + ids[j]);
         }
       }
@@ -1231,8 +1280,14 @@ window.PETQ = window.PETQ || {};
     _assertSlots: assertSlots,
     // hotzone letto per tema (GDD "Casa" -> camera): la UI sceglie in base a temaRazza(pet)
     _letto: { camera: { lab: LETTO_LAB_CAMERA, ship: LETTO_SHIP_CAMERA } },
+    // hotzone frigo per tema (GDD "Economia" -> "Spesa e dispensa"): tap -> menu posseduto
+    _frigoZona: { cucina: { lab: FRIGO_LAB_CUCINA, ship: FRIGO_SHIP_CUCINA } },
     _arredi: Object.keys(ARREDI),
     _temi: Object.keys(BUILDERS),
-    _stanze: ["cucina", "bagno", "salone", "camera"]
+    _stanze: ["cucina", "bagno", "salone", "camera"],
+    // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): pin permanente, separato dai luoghi
+    // missione (mai in MAPPA_PINS/LUOGHI). ui.js lo usa per il proprio hit-test dedicato.
+    _shopPinId: SHOP_PIN_ID,
+    _shopPin: MAPPA_PIN_SHOP
   };
 })();

@@ -54,6 +54,27 @@ window.PETQ = window.PETQ || {};
   // sessione appena creata da ui.js (il primo giro di boot() dopo un refresh arriva in pratica
   // subito dopo) e tutorialFatto parte false; altrimenti (pet piu' "vecchio" o assente) si tratta
   // di una partita gia' avviata prima del modulo missioni e tutorialFatto parte true.
+  // Migrazione dispensa array-di-{nome} -> inventario array-di-{nome, qty}: stessa logica
+  // duplicata in save.js (v. save.js migraDispensaAQty per il commento esteso), applicata
+  // anche qui perche' main.js ha la sua migrazione indipendente eseguita al boot.
+  function migraDispensaAQty(state) {
+    if (!state || !Array.isArray(state.dispensa)) { if (state) state.dispensa = []; return; }
+    var perNome = {};
+    var ordine = [];
+    for (var i = 0; i < state.dispensa.length; i++) {
+      var voce = state.dispensa[i];
+      var nome = typeof voce === 'string' ? voce : (voce && voce.nome);
+      if (!nome) continue;
+      var qty = (voce && typeof voce.qty === 'number' && voce.qty > 0) ? voce.qty : 1;
+      if (!Object.prototype.hasOwnProperty.call(perNome, nome)) {
+        perNome[nome] = 0;
+        ordine.push(nome);
+      }
+      perNome[nome] += qty;
+    }
+    state.dispensa = ordine.map(function (nome) { return { nome: nome, qty: perNome[nome] }; });
+  }
+
   function migraState(state) {
     if (!state) return;
 
@@ -67,8 +88,11 @@ window.PETQ = window.PETQ || {};
     }
     if (typeof state.ferite !== 'number') state.ferite = 0;
     if (typeof state.cureOggi !== 'number') state.cureOggi = 0;
-    if (!Array.isArray(state.dispensa)) state.dispensa = [];
+    migraDispensaAQty(state);
     if (typeof state.missione === 'undefined') state.missione = null;
+    if (!state.missioniFatte || typeof state.missioniFatte !== 'object' || Array.isArray(state.missioniFatte)) {
+      state.missioniFatte = {};
+    }
     if (!Array.isArray(state.categoriePastiOggi)) state.categoriePastiOggi = [];
 
     if (!haGiaCampiMissioni) {
@@ -82,6 +106,13 @@ window.PETQ = window.PETQ || {};
       state.pet.stats.energia = 70;
     }
     if (typeof state.sonno === 'undefined') state.sonno = null;
+
+    // Migrazione orologio di gioco (fix "sonno + orologio"): i salvataggi che non conoscono
+    // ancora state.gameMinutes lo inizializzano dall'ora REALE corrente, per continuita'
+    // (v. clock.js inizializzaOrologio/avanzaOrologio).
+    if (typeof state.gameMinutes !== 'number' && PETQ.clock && PETQ.clock.inizializzaOrologio) {
+      PETQ.clock.inizializzaOrologio(state);
+    }
 
     if (PETQ.pet && state.pet) {
       PETQ.pet.recomputeSalute(state.pet, state);
@@ -137,7 +168,12 @@ window.PETQ = window.PETQ || {};
     }
   }
 
-  PETQ.main = { avviaTicking: avviaTicking, migraState: migraState, controllaCicloSonno: controllaCicloSonno };
+  PETQ.main = {
+    avviaTicking: avviaTicking,
+    migraState: migraState,
+    controllaCicloSonno: controllaCicloSonno,
+    _migraDispensaAQty: migraDispensaAQty
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

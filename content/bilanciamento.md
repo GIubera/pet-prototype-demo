@@ -19,9 +19,10 @@ Ritmo cura target (playtest v2, 4 lug 2026, su ~14 ore attive): **2 pasti, almen
 |---|---|
 | Stat "critica" (sprite triste, notifiche) | < 25 |
 | Variante magra | media Fame ultimi 2 giorni < 30 |
-| Variante ciccione | >5 pasti/giorno per 2 giorni o >3 dolci/giorno |
+| Variante ciccione | >5 pasti/giorno per 2 giorni o >3 dolci/giorno o ≥2 sovralimentazioni recenti |
 | Overlay sporco | Igiene < 30 |
 | Malus missione da Salute | Salute < 40 → sprite sofferente + avviso prima di partire in missione |
+| Soglia sovralimentazione | Fame ≥ 90 al momento del pasto (solo teen+: dare da mangiare con la pancia già piena fa ingrassare e +10 Ferite; il baby non ne risente) |
 
 ## Sistema Salute (v1 — sostituisce la vecchia media pesata)
 
@@ -72,6 +73,8 @@ Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 4 
 
 **Regola fissa**: il fallimento compensa sempre con qualcosa, in tema con la missione. Mai un "meno secco".
 
+**Cooldown missioni** (playtest 4 lug 2026): una missione completata è esclusa dalla rosa per **3 giorni** (traccia data ultima esecuzione per id). Se le missioni disponibili scendono sotto la dimensione della rosa, si riammettono le completate più vecchie fino a riempirla — la rosa non è mai vuota. Numero tarabile.
+
 **Perk per categoria** — arredo piazzato = niente fallimento e sempre super successo nella sua categoria. Effetto booleano. **I perk esistono SOLO nelle missioni che li assegnano** (decisione fondatore: se ogni categoria ne avesse uno non sarebbero speciali). Nel prototipo sono tre:
 
 | Categoria | Nome perk | Da dove viene |
@@ -118,7 +121,9 @@ Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da r
 |---|---|
 | Sessioni al giorno | 1 |
 | Effetto | +1 alla stat scelta, +5 Felicità |
+| Durata allenamento (avanza l'orologio di gioco) | 90 minuti di gioco (decisione playtest 4 lug 2026; l'allenamento non è più istantaneo, "dura 1-2 ore" — proposta 90 min, da tarare) |
 | Insegna parola | max 1 al giorno, +5 Felicità |
+| Frequenza uso parola imparata nelle battute contestuali | 30% (alzata da 20% — il fondatore non la vedeva mai) |
 
 ## Stat iniziali alla generazione
 
@@ -136,15 +141,19 @@ Quinta stat di benessere (v. GDD "Energia e sonno", decisione fondatore 4 lug 20
 
 | Cosa | Valore |
 |---|---|
-| Decadimento Energia (per ora di gioco attivo) | −4 |
+| Decadimento Energia (per ora di gioco attivo) | −2 |
 | Costo missione | −8 per ora di durata |
 | Costo allenamento | −10 |
 | Soglia rifiuto (missioni e allenamento) | < 20 |
-| Ora del letto (da qui si può andare a dormire) | 21 |
+| Ora del letto (da qui inizia il sonno notturno) | 21 |
 | Ora del crollo automatico (se sveglio e non a letto) | 23 |
-| Sveglia autonoma dopo | 8 ore di sonno |
-| Sonno minimo per sveglia "buona" | 6 ore |
-| Energia al risveglio (dormito bene, a letto ≥6h) | 100 |
+| Riposino (prima delle 21) — durata max | 2 ore di gioco |
+| Riposino — durata minima prima di poter svegliare | 1 ora di gioco |
+| Recupero riposino | +15 Energia per ora dormita (2h piene = +30) |
+| Sonno notturno (dalle 21) — durata max / sveglia autonoma | 8 ore di gioco |
+| Sonno notturno — durata minima prima di poter svegliare | 5 ore di gioco |
+| Energia al risveglio notturno (≥5h, riposo pieno) | 100 |
+| Energia al risveglio notturno (crollato alle 23) | 70 |
 | Energia al risveglio (crollato/dormito male) | 70 |
 
 Note di design: sotto la soglia rifiuto, oltre a bloccare missioni/allenamento, la Felicità cala più in fretta (stessa regola delle altre stat critiche). Se il giocatore sveglia il pet prima delle 6 ore, l'Energia torna proporzionale alle ore dormite (min 30) invece del valore pieno: è una scelta del giocatore, non una punizione fissa.
