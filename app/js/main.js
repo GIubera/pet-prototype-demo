@@ -98,6 +98,12 @@ window.PETQ = window.PETQ || {};
     if (!haGiaCampiMissioni) {
       state.tutorialFatto = !eAppenaIniziata;
     }
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): stessa regola di migrazione
+    // duplicata in save.js/missions.js — tutorial gia' fatto = negozio gia' sbloccato (il
+    // vecchio Market separato era comunque sempre accessibile).
+    if (typeof state.negozioSbloccato !== 'boolean') {
+      state.negozioSbloccato = !!state.tutorialFatto;
+    }
 
     // Migrazione modulo Energia e sonno (v. save.js migraState, stessa regola duplicata qui
     // perche' main.js ha la sua migrazione indipendente eseguita al boot): energia parte a 70

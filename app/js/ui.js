@@ -403,11 +403,16 @@ window.PETQ = window.PETQ || {};
       missioniFatte: {},
       ferite: 0,
       cureOggi: 0,
-      // Inventario/frigo (GDD "Economia" -> "Spesa e dispensa"): array di {nome, qty}. Stock
-      // iniziale 3 Crocchette semplici cosi' la cucina non e' vuota al primo avvio.
-      dispensa: [{ nome: 'Crocchette semplici', qty: 3 }],
+      // Inventario/frigo (GDD "Economia" -> "Spesa e dispensa"): array di {nome, qty}. Parte
+      // VUOTO: e' il tutorial del Negozio (m0, v. missions.js risolviTutorial) a rifornirlo la
+      // prima volta, cosi' il regalo di benvenuto ha senso (prima girava un doppio stock: uno
+      // qui e uno dato dal tutorial, ora c'e' solo quello del tutorial).
+      dispensa: [],
       categoriePastiOggi: [],
       tutorialFatto: false,
+      // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): il pin Negozio (m0) sblocca il
+      // menu acquisto SOLO dopo il tutorial. Finche' e' false, tap su m0 = tutorial.
+      negozioSbloccato: false,
       sonno: null
     };
     // orologio di gioco: parte dall'ora REALE corrente (stessa regola di migrazione dei
@@ -1332,6 +1337,12 @@ window.PETQ = window.PETQ || {};
       animazioneInCorso = false;
       var r = PETQ.care.train(currentState, prop.stat);
       dopoAzione(r);
+      // Allenamento non istantaneo (bilanciamento.md "Durata allenamento"): l'orologio salta
+      // di ~90 minuti, quindi lo segnaliamo con un toast esplicito oltre al fumetto di
+      // dopoAzione, cosi' l'effetto e' leggibile e non sembra un'azione istantanea.
+      if (r && r.ok && r.minutiAvanzati) {
+        mostraToast(r.minutiAvanzati + ' minuti di allenamento');
+      }
     });
   }
 
@@ -1467,7 +1478,7 @@ window.PETQ = window.PETQ || {};
     container.appendChild(chiudiBtn);
 
     if (dispensa.length === 0) {
-      container.appendChild(el('p', 'petq-vuoto', 'Il frigo è vuoto: fai un salto al Market sulla mappa.'));
+      container.appendChild(el('p', 'petq-vuoto', 'Il frigo è vuoto: fai un salto al Negozio sulla mappa.'));
       return;
     }
 
@@ -1887,20 +1898,26 @@ window.PETQ = window.PETQ || {};
 
   // Stato corrente della mappa: quali pin sono attivi/tappabili, quale luogo è "in corso",
   // e le schede per costruire il pannello dettaglio.
+  // Negozio unico (GDD "Economia" -> "Spesa e dispensa", fix fondatore): il pin del Negozio
+  // (m0) è SEMPRE illuminato una volta sbloccato (state.negozioSbloccato), indipendentemente
+  // dalla rosa/missione in corso — non fa mai parte della rotazione missioni (resta escluso da
+  // rosaDelGiorno), ma resta sempre tappabile per il menu acquisto (v. hitShopPin).
   function statoMappa() {
     if (!currentState.tutorialFatto) {
       var m0 = PETQ.missions.tutorialDaProporre(currentState);
       if (m0) return { attivi: ['m0'], inCorso: null, tutorial: m0, rosa: [m0] };
     }
+    var negozioAttivo = !!currentState.negozioSbloccato;
     if (currentState.missione) {
-      return { attivi: [], inCorso: currentState.missione.id, tutorial: null, rosa: [] };
+      return { attivi: negozioAttivo ? ['m0'] : [], inCorso: currentState.missione.id, tutorial: null, rosa: [] };
     }
     if (missioneEsauritaOggi()) {
-      return { attivi: [], inCorso: null, tutorial: null, rosa: [], esaurita: true };
+      return { attivi: negozioAttivo ? ['m0'] : [], inCorso: null, tutorial: null, rosa: [], esaurita: true };
     }
     var rosa = PETQ.missions.rosaDelGiorno(currentState) || [];
     var attivi = [];
     for (var i = 0; i < rosa.length; i++) attivi.push(rosa[i].id);
+    if (negozioAttivo && attivi.indexOf('m0') === -1) attivi.push('m0');
     return { attivi: attivi, inCorso: null, tutorial: null, rosa: rosa };
   }
 
@@ -1909,10 +1926,10 @@ window.PETQ = window.PETQ || {};
     var nome = currentState.pet.nome || 'il pet';
 
     var hint;
-    if (sm.inCorso) hint = nome + ' è in giro per la città: eccolo sulla mappa. Il Market resta aperto.';
+    if (sm.inCorso) hint = nome + ' è in giro per la città: eccolo sulla mappa. Il Negozio resta aperto.';
     else if (sm.tutorial) hint = 'Primo giorno: tocca il pin del negozio di giocattoli.';
-    else if (sm.esaurita) hint = 'Missione di oggi completata: torna domani per una nuova rosa. Il Market resta aperto.';
-    else hint = 'Scegli una destinazione per ' + nome + ', o fai la spesa al Market.';
+    else if (sm.esaurita) hint = 'Missione di oggi completata: torna domani per una nuova rosa. Il Negozio resta aperto.';
+    else hint = 'Scegli una destinazione per ' + nome + ', o fai la spesa al Negozio.';
     container.appendChild(el('p', 'petq-hint', hint));
 
     var mappaWrap = el('div', 'petq-mappa-wrap');
@@ -1978,11 +1995,9 @@ window.PETQ = window.PETQ || {};
     for (var i = 0; i < attivi.length; i++) {
       piazzaEtichetta(pins[attivi[i]], NOME_BREVE_LUOGO[attivi[i]]);
     }
-    // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): etichetta SEMPRE visibile, il pin non
-    // fa parte della rosa a rotazione quindi non passa mai da 'attivi'.
-    if (PETQ.rooms && PETQ.rooms._shopPin) {
-      piazzaEtichetta(PETQ.rooms._shopPin, 'Market');
-    }
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): m0 è già incluso in 'attivi'
+    // quando sbloccato (v. statoMappa), quindi prende l'etichetta "Negozio" dal loop sopra
+    // come qualunque altro luogo — nessuna etichetta "Market" separata da piazzare.
   }
 
   function aggiornaDettaglioMappa(sm) {
@@ -2029,12 +2044,14 @@ window.PETQ = window.PETQ || {};
     dettaglio.style.display = '';
   }
 
-  // ---------- shop cibo (pin permanente sulla mappa, GDD "Economia" -> "Spesa e dispensa") ----------
+  // ---------- shop cibo (Negozio unico, pin m0 sulla mappa: GDD "Economia" -> "Spesa e dispensa") ----------
   // Menu ACQUISTO (non una missione): lista dei cibi da content/cibi.md con prezzo; "Compra"
   // acquista 1 porzione, ripetibile, scala le monete e incrementa la qty in dispensa (frigo).
+  // Stesso edificio del tutorial m0: prima del tutorial il tap apre cardTutorial, dopo apre
+  // questo pannello (v. statoMappa/aggiornaDettaglioMappa/installaPointerMappa).
   function pannelloShop() {
     var wrap = el('div', 'petq-missione-card petq-shop-card');
-    wrap.appendChild(el('div', 'petq-missione-titolo', 'Market'));
+    wrap.appendChild(el('div', 'petq-missione-titolo', 'Negozio'));
     wrap.appendChild(el('div', 'petq-missione-meta', 'Compra cibo: finisce nel frigo in cucina, gratis da lì in poi.'));
 
     var data = window.PETQ.content && window.PETQ.content.data;
@@ -2121,8 +2138,12 @@ window.PETQ = window.PETQ || {};
     return null;
   }
 
-  // hit-test sul pin shop (SEMPRE tappabile, GDD: "sempre accessibile", distinto dalla rosa)
+  // hit-test sul pin del Negozio (m0), SOLO dopo lo sblocco (GDD "Economia" -> "Spesa e
+  // dispensa": negozio unico). Prima del tutorial, il tap su m0 deve invece seguire il
+  // percorso normale hitPin/tutorial (v. installaPointerMappa sotto) — questo hit-test attiva
+  // il menu ACQUISTO, non va confuso col tutorial.
   function hitShopPin(p) {
+    if (!currentState || !currentState.negozioSbloccato) return false;
     var rect = PETQ.rooms && PETQ.rooms._shopPin;
     return !!(rect && dentroRect(p, rect, 3));
   }

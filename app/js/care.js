@@ -63,7 +63,7 @@ window.PETQ = window.PETQ || {};
     if (!state || !state.pet || !cibo) return { ok: false, msg: 'errore interno' };
 
     if (!consumaDaDispensa(state, cibo.nome)) {
-      return { ok: false, msg: 'Non ne hai in frigo: compralo al Market.' };
+      return { ok: false, msg: 'Non ne hai in frigo: compralo al Negozio.' };
     }
 
     var pet = state.pet;
@@ -196,7 +196,14 @@ window.PETQ = window.PETQ || {};
       PETQ.pet.recomputeSalute(state.pet, state);
     }
 
-    return { ok: true, msg: 'Allenamento completato: +' + effetto + ' ' + statNome + '.' };
+    // minutiAvanzati esposto per la UI (toast "N minuti di allenamento", GDD/bilanciamento.md
+    // "Durata allenamento"): cosi' il numero mostrato viene sempre da questa unica costante,
+    // mai duplicato a mano in ui.js.
+    return {
+      ok: true,
+      msg: 'Allenamento completato: +' + effetto + ' ' + statNome + '.',
+      minutiAvanzati: Math.round(DURATA_ALLENAMENTO_ORE * 60)
+    };
   }
 
   function teachWord(state, parola) {

@@ -19,6 +19,18 @@ window.PETQ = window.PETQ || {};
 
   var NOME_ALLENATORE = 'Il Topo (allenatore)';
 
+  // Negozio unico (GDD "Economia" -> "Spesa e dispensa", fix fondatore): il pet nasce con la
+  // dispensa VUOTA (lo stock iniziale "3 crocchette" e' stato spostato qui, cosi' il regalo
+  // del tutorial ha senso). Il tutorial del Negozio (m0) rifornisce la dispensa con un po' di
+  // cibo di partenza, oltre al regalo di personalita' gia' esistente: 3 Crocchette semplici
+  // (il cibo base economico) + 2 porzioni di un cibo scelto a caso tra gli altri disponibili
+  // (varieta', cosi' il primo pasto non e' per forza il piu' anonimo). Numeri scelti per
+  // coprire circa un giorno di cura (bilanciamento.md: ~2 pasti/giorno) senza gia' risolvere
+  // tutta l'economia del gioco.
+  var TUTORIAL_CROCCHETTE_QTY = 3;
+  var TUTORIAL_CIBO_EXTRA_QTY = 2;
+  var TUTORIAL_CIBO_BASE = 'Crocchette semplici';
+
   // Cooldown missioni (GDD "Missioni" / bilanciamento.md "Cooldown missioni", playtest 4 lug
   // 2026): una missione completata esce dalla rosa per COOLDOWN_GIORNI giorni di gioco. Il
   // tutorial m0 e' escluso dal meccanismo (fuoriRosa, non passa mai da qui).
@@ -55,6 +67,13 @@ window.PETQ = window.PETQ || {};
     if (typeof state.missione === 'undefined') state.missione = null;
     if (typeof state.coins !== 'number') state.coins = 0;
     state.tutorialFatto = !!state.tutorialFatto;
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): migrazione salvataggi vecchi —
+    // se il tutorial risulta gia' fatto (partita pre-esistente) il negozio era gia'
+    // implicitamente disponibile (era il Market separato, sempre attivo), quindi si sblocca
+    // qui senza dover rifare il tutorial. Se manca del tutto, segue tutorialFatto.
+    if (typeof state.negozioSbloccato !== 'boolean') {
+      state.negozioSbloccato = !!state.tutorialFatto;
+    }
     // Cooldown missioni: mappa {id: 'YYYY-MM-DD' ultima esecuzione}, settata alla RISOLUZIONE
     // (v. risolvi). Migrazione: i salvataggi vecchi non ce l'hanno, si parte da mappa vuota
     // (nessuna missione in cooldown finche' non se ne completa una nuova).
@@ -66,6 +85,24 @@ window.PETQ = window.PETQ || {};
   function dataMissioni() {
     var data = window.PETQ.content && window.PETQ.content.data;
     return (data && data.missioni) || [];
+  }
+
+  // Rifornisce la dispensa del regalo di benvenuto del tutorial (v. costanti sopra): riusa
+  // applicaRewardToken('cibo:Nome') gia' esistente per non duplicare la logica di incremento
+  // qty. Il "cibo a caso" pesca dalla lista content.data.cibi (esclude la base per dare
+  // varieta'); se il content non e' ancora caricato o ha solo la base, salta la parte extra
+  // senza rompere il tutorial (il regalo di personalita' resta comunque valido).
+  function rifornisciDispensaTutorial(state, rewardsOut) {
+    for (var i = 0; i < TUTORIAL_CROCCHETTE_QTY; i++) {
+      applicaRewardToken(state, 'cibo:' + TUTORIAL_CIBO_BASE, rewardsOut);
+    }
+    var tuttiCibi = (window.PETQ.content && window.PETQ.content.data && window.PETQ.content.data.cibi) || [];
+    var altriCibi = tuttiCibi.filter(function (c) { return c.nome !== TUTORIAL_CIBO_BASE; });
+    if (altriCibi.length === 0) return;
+    var scelto = PETQ.rng.pick(altriCibi);
+    for (var j = 0; j < TUTORIAL_CIBO_EXTRA_QTY; j++) {
+      applicaRewardToken(state, 'cibo:' + scelto.nome, rewardsOut);
+    }
   }
 
   function trovaScheda(id) {
@@ -255,6 +292,15 @@ window.PETQ = window.PETQ || {};
       }
     }
 
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): il tutorial, oltre al regalo di
+    // personalita' sopra, rifornisce la dispensa di partenza e sblocca il Negozio (m0) come
+    // shop sempre accessibile (v. statoMappa/pannelloShop in ui.js).
+    try {
+      rifornisciDispensaTutorial(state, rewards);
+    } catch (e) {
+      console.warn('PETQ.missions: errore rifornendo la dispensa del tutorial', e);
+    }
+    state.negozioSbloccato = true;
     state.tutorialFatto = true;
 
     return {

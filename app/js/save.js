@@ -56,6 +56,14 @@ window.PETQ = window.PETQ || {};
     migraDispensaAQty(state);
     if (!Array.isArray(state.categoriePastiOggi)) state.categoriePastiOggi = [];
     state.tutorialFatto = !!state.tutorialFatto;
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): migrazione — i salvataggi con
+    // tutorial gia' fatto avevano gia' accesso al vecchio Market separato, quindi il negozio
+    // si considera sbloccato senza dover rifare il tutorial. Stessa regola duplicata in
+    // missions.js assicuraStatoMissioni e main.js migraState (pattern gia' usato per gli altri
+    // campi di questa migrazione).
+    if (typeof state.negozioSbloccato !== 'boolean') {
+      state.negozioSbloccato = !!state.tutorialFatto;
+    }
     if (typeof state.missione === 'undefined') state.missione = null;
     if (!state.missioniFatte || typeof state.missioniFatte !== 'object' || Array.isArray(state.missioniFatte)) {
       state.missioniFatte = {};

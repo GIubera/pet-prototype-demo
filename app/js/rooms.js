@@ -493,14 +493,12 @@ window.PETQ = window.PETQ || {};
     m7: { x: 84,  y: 98, w: 34, h: 26 }  // Fogne / Laboratorio Abbandonato
   };
 
-  // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): pin FISSO e SEMPRE illuminato, distinto
-  // dalla rosa a rotazione delle missioni (occupa lo spazio libero tra Neon Avenue e le Fogne,
-  // sotto la strada verticale). Tap -> menu acquisto (ui.js), non una missione: nessuna
-  // scheda in content/missioni.md, nessun id 'm*'. Chiave separata da MAPPA_PINS/LUOGHI cosi'
-  // il resto del codice (rosaDelGiorno, statoMappa, hitPin sui soli 'attivi') non lo confonde
-  // mai con un luogo missione.
-  var SHOP_PIN_ID = 'shop';
-  var MAPPA_PIN_SHOP = { x: 64, y: 100, w: 20, h: 24 };
+  // Negozio unico (GDD "Economia" -> "Spesa e dispensa", fix fondatore): NON esiste piu' un
+  // pin "Market" separato. Il Negozio di Giocattoli (m0, MAPPA_PINS.m0) e' l'UNICO shop sulla
+  // mappa: prima del tutorial e' il luogo del tutorial, dopo diventa il pin permanente del
+  // menu acquisto cibo. Riusiamo le sue stesse coordinate per il pin "sempre illuminato".
+  var SHOP_PIN_ID = 'm0';
+  var MAPPA_PIN_SHOP = MAPPA_PINS.m0;
 
   // pin a goccia gialla sopra un luogo; bright = frame di pulsazione
   function mapPin(g, cx, tipY, bright) {
@@ -694,26 +692,6 @@ window.PETQ = window.PETQ || {};
     }
   }
 
-  // Shop cibo "Market" (GDD "Economia" -> "Spesa e dispensa"): tettoia a righe verde/crema,
-  // cassette di frutta colorate in vetrina, insegna sempre accesa. SEMPRE illuminato (nessun
-  // parametro "on": a differenza dei luoghi missione non fa mai parte della rosa spenta),
-  // silhouette diversa dal Negozio di Giocattoli (m0, tenda rosso/crema) per non confondersi.
-  function luogoShop(g) {
-    var r = MAPPA_PIN_SHOP;
-    O(g, r.x, r.y + 6, r.w, r.h - 6, "#0e1118", "#e8dfc4"); // corpo edificio
-    R(g, r.x + 1, r.y + 1, r.w - 2, 5, "#3f9c5c"); // tettoia verde
-    R(g, r.x + 1, r.y + 5, r.w - 2, 1, "#2c7a44");
-    for (var i = 0; i < r.w - 2; i += 4) R(g, r.x + 1 + i, r.y + 1, 2, 5, "#5cc47f"); // righe tenda
-    R(g, r.x + 3, r.y + 9, r.w - 6, 3, "#f8e05a"); // insegna gialla
-    // vetrina con cassette di frutta colorate
-    R(g, r.x + 3, r.y + 13, r.w - 6, 8, "#2e3a2c");
-    R(g, r.x + 4, r.y + 14, 4, 3, "#e85a5a"); // mele
-    R(g, r.x + 9, r.y + 14, 4, 3, "#f0b84a"); // arance
-    R(g, r.x + 14, r.y + 15, 3, 2, "#5ce87f"); // insalata
-    // porta
-    R(g, r.x + 7, r.y + 21, 6, 3, "#5c3a1e");
-  }
-
   var LUOGHI = {
     m0: luogoNegozio, m1: luogoSalaGiochi, m2: luogoParco, m3: luogoDojo, m4: luogoBiblioteca,
     m5: luogoIndustria, m6: luogoStudioTV, m7: luogoFogne, m8: luogoNeonAvenue
@@ -824,11 +802,6 @@ window.PETQ = window.PETQ || {};
       var on = attivi.indexOf(id) >= 0 || stato.inCorso === id;
       LUOGHI[id](g, on);
     }
-    // Shop cibo: SEMPRE disegnato illuminato (non fa parte della rosa a rotazione, v.
-    // MAPPA_PIN_SHOP), con pin proprio sempre visibile (nessun frame di pulsazione: non e'
-    // mai "in corso" come una missione).
-    luogoShop(g);
-    mapPin(g, pinCx(MAPPA_PIN_SHOP), pinTipY(MAPPA_PIN_SHOP), false);
 
     // pin sopra i luoghi attivi; quello in corso pulsa su 2 frame
     for (id in LUOGHI) {
@@ -846,13 +819,14 @@ window.PETQ = window.PETQ || {};
   }
 
   // assert di sviluppo: rettangoli dentro il canvas, dimensioni minime, niente sovrapposizioni (luoghi e pin)
+  // Negozio unico: MAPPA_PIN_SHOP e' un alias di MAPPA_PINS.m0 (v. sopra), quindi basta
+  // controllare MAPPA_PINS una sola volta, nessun pin "shop" aggiuntivo da unire qui.
   function assertMappa() {
     var tuttiIPin = {};
     var idL;
     for (idL in MAPPA_PINS) {
       if (Object.prototype.hasOwnProperty.call(MAPPA_PINS, idL)) tuttiIPin[idL] = MAPPA_PINS[idL];
     }
-    tuttiIPin[SHOP_PIN_ID] = MAPPA_PIN_SHOP; // pin permanente shop, stesso check dei luoghi missione
 
     var ids = [];
     var id;
@@ -1285,8 +1259,9 @@ window.PETQ = window.PETQ || {};
     _arredi: Object.keys(ARREDI),
     _temi: Object.keys(BUILDERS),
     _stanze: ["cucina", "bagno", "salone", "camera"],
-    // Shop cibo (GDD "Economia" -> "Spesa e dispensa"): pin permanente, separato dai luoghi
-    // missione (mai in MAPPA_PINS/LUOGHI). ui.js lo usa per il proprio hit-test dedicato.
+    // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): SHOP_PIN_ID/MAPPA_PIN_SHOP sono
+    // ora un alias del Negozio di Giocattoli m0 (stesso pin, stessa silhouette) — non esiste
+    // piu' un edificio "Market" separato. ui.js li usa per il proprio hit-test del menu acquisto.
     _shopPinId: SHOP_PIN_ID,
     _shopPin: MAPPA_PIN_SHOP
   };
