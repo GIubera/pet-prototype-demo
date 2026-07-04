@@ -7,9 +7,11 @@ Il codice legge QUESTO file: cambiare un numero qui cambia il gioco. Le sezioni 
 | Stat | Calo/ora | Note |
 |---|---|---|
 | Fame | −6 | ~2 pasti al giorno per stare sopra 50 |
-| Igiene | −3 | −15 extra se ci sono bisogni non puliti |
+| Igiene | −8 | −15 extra se ci sono bisogni non puliti; con −8/ora servono ~2 lavaggi al giorno |
 | Felicità | −2 | −5/ora se Fame o Igiene sotto 25; raddoppia se Salute < 25 |
 | Salute | v. sezione Sistema Salute | non decade da sola: è 100 − Ferite − Malus condizioni |
+
+Ritmo cura target (playtest v2, 4 lug 2026, su ~14 ore attive): **2 pasti, almeno 2 lavaggi, almeno 3 pulizie bisogni al giorno**. Bisogni legati alla digestione: 60-90 minuti di gioco dopo OGNI pasto lo spawn è quasi garantito (p 0.9), più un baseline casuale ridotto (0.05/ora). I numeri della digestione vivono nel codice (pet.js applyDecay / care.js feed), qui la regola.
 
 ## Soglie
 
@@ -35,9 +37,12 @@ Il codice legge QUESTO file: cambiare un numero qui cambia il gioco. Le sezioni 
 |---|---|
 | Fame < 25 da più di 6 ore di gioco | +15 |
 | Igiene < 25 da più di 6 ore di gioco | +15 |
+| Energia < 25 da più di 6 ore di gioco | +15 |
 | 2+ bisogni non puliti in casa | +10 |
 | Dieta squilibrata (2 giorni con una sola categoria, o solo dolci) | +10 |
 | Cap totale malus | 50 |
+
+Nota (punto 8, aggiunta fondatore): lo sfinimento prolungato ammala il pet come fame/igiene basse — stesso tracking "sotto soglia da quando 6h+"; una dormita che riporta l'Energia sopra soglia azzera il tracking e il malus sparisce da solo.
 
 ### Effetti della Salute
 | Soglia | Cosa succede |
@@ -120,8 +125,10 @@ Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da r
 | Cosa | Valore |
 |---|---|
 | Benessere | tutte a 70 |
-| RPG | 0 punti base + casuale 0-3 per stat, poi +1 alla stat "firma" della personalità |
+| RPG | budget di 3 punti base assegnati a caso una alla volta (impilabili sulla stessa stat), poi bonus di 1 alla stat "firma" |
 | Stat firma | gentile→Carisma, maleducato→Intelligenza, nerd→Intelligenza, sportivo→Forza — nerd e maleducato differenziati via item del tutorial (GameBit vs Fumetto sarcastico) |
+
+Nota per il parser (content.js parseBilanciamento): la riga "RPG" sopra deve contenere ESATTAMENTE due numeri — il primo è il budget, il secondo (ultimo) è il bonus firma. Totale iniziale = budget + firma (oggi 3+1=4). Se si aggiungono altri numeri a quella riga, il parser li legge male: tenerla pulita.
 
 ## Energia e sonno
 

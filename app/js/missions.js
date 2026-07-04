@@ -211,6 +211,11 @@ window.PETQ = window.PETQ || {};
     if (state.missione) {
       return { ok: false, msg: 'Una missione e\' gia\' in corso.' };
     }
+    // limite 1 missione al giorno (fix playtest): missioneGiorno viene marcato alla
+    // RISOLUZIONE (v. risolvi); il tutorial M0 non passa da qui e non conta
+    if (state.missioneGiorno === oggiStr()) {
+      return { ok: false, msg: 'Una missione al giorno: torna domani.' };
+    }
     if (state.sonno) {
       return { ok: false, msg: (state.pet && state.pet.nome ? state.pet.nome : 'Il pet') + ' sta dormendo.' };
     }
@@ -541,6 +546,9 @@ window.PETQ = window.PETQ || {};
     };
 
     state.missione = null;
+    // limite 1 missione al giorno (fix playtest): marca il giorno alla risoluzione;
+    // avvia() rifiuta finche' non cambia data (il debug "Nuovo giorno" azzera questo campo)
+    state.missioneGiorno = oggiStr();
 
     return risultato;
   }

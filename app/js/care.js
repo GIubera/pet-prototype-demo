@@ -7,7 +7,7 @@ window.PETQ = window.PETQ || {};
     if (data && data.bilanciamento) return data.bilanciamento;
     console.warn('PETQ.care: bilanciamento non disponibile, uso default locali');
     return {
-      decadimento: { fame: 6, igiene: 3, felicita: 2 },
+      decadimento: { fame: 6, igiene: 8, felicita: 2 },
       soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
       economia: { login: 10, monetePartenza: 50 },
       allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
@@ -50,7 +50,13 @@ window.PETQ = window.PETQ || {};
     }
 
     if (!pet.pastiOggi) pet.pastiOggi = [];
-    pet.pastiOggi.push({ nome: cibo.nome, categoria: cibo.categoria, quando: Date.now() });
+    // digestioneOre: 60-90 minuti di GIOCO dopo il pasto scatta il bisogno
+    // (v. pet.js applyDecay, ritmo cura playtest v2)
+    pet.pastiOggi.push({
+      nome: cibo.nome, categoria: cibo.categoria, quando: Date.now(),
+      digerito: false, oreDigerite: 0,
+      digestioneOre: 1 + PETQ.rng.rand() * 0.5
+    });
 
     PETQ.pet.recomputeSalute(pet, state);
 

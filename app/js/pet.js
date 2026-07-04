@@ -33,11 +33,11 @@ window.PETQ = window.PETQ || {};
     if (data && data.bilanciamento) return data.bilanciamento;
     console.warn('PETQ.pet: bilanciamento non disponibile, uso default locali');
     return {
-      decadimento: { fame: 6, igiene: 3, felicita: 2 },
+      decadimento: { fame: 6, igiene: 8, felicita: 2 },
       soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
       economia: { login: 10, monetePartenza: 50 },
       allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
-      iniziali: { benessere: 70, base: 0, firma: 1 },
+      iniziali: { benessere: 70, budget: 3, firma: 1 },
       energia_sonno: DEFAULT_ENERGIA_SONNO
     };
   }
@@ -70,14 +70,17 @@ window.PETQ = window.PETQ || {};
     var personalita = PETQ.rng.pick(PERSONALITA_LIST);
     var statFirma = STAT_FIRMA[personalita] || 'carisma';
 
-    var base = (bil.iniziali && typeof bil.iniziali.base === 'number') ? bil.iniziali.base : 0;
+    // Stat iniziali (GDD "Alla nascita", playtest v2): budget FISSO di punti assegnati
+    // uno alla volta a stat casuali (possono impilarsi), poi bonus alla stat firma.
+    // Totale sempre budget+firma (default 3+1=4): niente tuttofare, identita' = firma + al piu' un picco.
+    var budget = (bil.iniziali && typeof bil.iniziali.budget === 'number') ? bil.iniziali.budget : 3;
     var firmaBonus = (bil.iniziali && typeof bil.iniziali.firma === 'number') ? bil.iniziali.firma : 1;
     var benessere = (bil.iniziali && typeof bil.iniziali.benessere === 'number') ? bil.iniziali.benessere : 70;
 
     var rpg = { forza: 0, intelligenza: 0, velocita: 0, carisma: 0 };
     var statNomi = ['forza', 'intelligenza', 'velocita', 'carisma'];
-    for (var i = 0; i < statNomi.length; i++) {
-      rpg[statNomi[i]] = base + PETQ.rng.randInt(0, 3);
+    for (var i = 0; i < budget; i++) {
+      rpg[PETQ.rng.pick(statNomi)] += 1;
     }
     rpg[statFirma] += firmaBonus;
 
@@ -109,9 +112,13 @@ window.PETQ = window.PETQ || {};
   // etichettate in modo univoco per numeroDaEtichetta), quindi qui usiamo i default scritti
   // nel file come fallback fisso, con nota esplicita: se si vuole renderli configurabili va
   // esteso parseBilanciamento in content.js con lo stesso pattern delle altre righe.
+  // energiaBassaOre/Malus: punto 8 (aggiunta fondatore) — stesso pattern di fame/igiene basse:
+  // lo sfinimento prolungato (Energia < soglia critica per 6h+ di gioco) ammala il pet, una
+  // bella dormita lo risana (il risveglio riporta Energia alta -> il malus sparisce da solo).
   var MALUS_CONDIZIONI = {
     fameBassaOre: 6, fameBassaMalus: 15,
     igieneBassaOre: 6, igieneBassaMalus: 15,
+    energiaBassaOre: 6, energiaBassaMalus: 15,
     poopSoglia: 2, poopMalus: 10,
     dietaSquilibrataMalus: 10,
     capTotale: 50
@@ -121,11 +128,14 @@ window.PETQ = window.PETQ || {};
     return Math.max(min, Math.min(max, v));
   }
 
-  // spawn dei bisogni: probabilità proporzionale alle ore trascorse e ai pasti recenti,
-  // target ~2-3 al giorno (12 ore attive tipiche => p/ora tarata per attesa ~2.5/giorno),
-  // max state.poop = 3. Numero non presente in bilanciamento.md: default locale.
-  var POOP_PER_ORA_BASE = 0.12; // console.warn segnalato sotto, una sola volta per chiamata se serve
-  var POOP_BONUS_PER_PASTO = 0.05;
+  // spawn dei bisogni (ritmo cura, playtest v2 — v. bilanciamento.md "decadimento/note"):
+  // legati alla DIGESTIONE: 60-90 minuti di gioco dopo OGNI pasto, spawn quasi garantito
+  // (p=0.9, flag digerito sul pasto), piu' un baseline casuale ridotto. Target: con 2 pasti
+  // + snack ~3+ bisogni/giorno, "poco dopo mangiato". Max state.poop = 3.
+  var POOP_BASE_ORA = 0.05;
+  var POOP_PROB_DIGESTIONE = 0.9;
+  var DIGESTIONE_ORE_MIN = 1;      // 60 minuti di gioco...
+  var DIGESTIONE_ORE_EXTRA = 0.5;  // ...piu' 0-30 casuali (60-90)
 
   function applyDecay(pet, gameHours, state) {
     if (!pet || !(gameHours > 0)) {
@@ -142,7 +152,7 @@ window.PETQ = window.PETQ || {};
     }
 
     var bil = bilanciamento();
-    var dec = bil.decadimento || { fame: 6, igiene: 3, felicita: 2 };
+    var dec = bil.decadimento || { fame: 6, igiene: 8, felicita: 2 };
     var soglie = bil.soglie || { critica: 25, magro: 30, sporco: 30, malusSalute: 40 };
     var es = bilEnergiaSonno();
 
@@ -161,17 +171,30 @@ window.PETQ = window.PETQ || {};
     }
     pet.stats.felicita = clamp(pet.stats.felicita - calofelicita, 0, 100);
 
-    // spawn bisogni (poop)
+    // spawn bisogni (poop): digestione dei pasti + baseline
     if (state) {
       if (typeof state.poop !== 'number') state.poop = 0;
-      var pastiRecenti = (state.pet && state.pet.pastiOggi) ? state.pet.pastiOggi.length : 0;
-      var probOra = POOP_PER_ORA_BASE + POOP_BONUS_PER_PASTO * pastiRecenti;
-      var probEvento = 1 - Math.pow(1 - probOra, gameHours);
+      var pasti = (state.pet && state.pet.pastiOggi) || [];
+      for (var pi = 0; pi < pasti.length; pi++) {
+        var pasto = pasti[pi];
+        if (!pasto || pasto.digerito) continue;
+        // difese per pasti registrati prima di questa versione (salvataggi vecchi)
+        if (typeof pasto.digestioneOre !== 'number') pasto.digestioneOre = DIGESTIONE_ORE_MIN + PETQ.rng.rand() * DIGESTIONE_ORE_EXTRA;
+        if (typeof pasto.oreDigerite !== 'number') pasto.oreDigerite = 0;
+        pasto.oreDigerite += gameHours;
+        if (pasto.oreDigerite >= pasto.digestioneOre) {
+          pasto.digerito = true;
+          if (state.poop < 3 && PETQ.rng.rand() < POOP_PROB_DIGESTIONE) {
+            state.poop = Math.min(3, state.poop + 1);
+          }
+        }
+      }
+      var probEvento = 1 - Math.pow(1 - POOP_BASE_ORA, gameHours);
       if (state.poop < 3 && PETQ.rng.rand() < probEvento) {
         state.poop = Math.min(3, state.poop + 1);
       }
 
-      // tracking "sotto soglia da quando": serve al malus condizioni (fame/igiene < 25 per 6h+).
+      // tracking "sotto soglia da quando": serve al malus condizioni (fame/igiene/energia < 25 per 6h+).
       // Soglia critica riusata da bilanciamento.soglie.critica (stesso valore usato altrove nel prototipo).
       var sogliaMalus = (typeof soglie.critica === 'number') ? soglie.critica : 25;
       if (pet.stats.fame < sogliaMalus) {
@@ -183,6 +206,13 @@ window.PETQ = window.PETQ || {};
         if (typeof state.igieneBassaDaMs !== 'number') state.igieneBassaDaMs = Date.now();
       } else {
         state.igieneBassaDaMs = null;
+      }
+      // punto 8 (aggiunta fondatore): energia bassa prolungata ammala il pet, stesso pattern.
+      // Una dormita riporta l'Energia sopra soglia -> il tracking si azzera e il malus sparisce.
+      if (pet.stats.energia < sogliaMalus) {
+        if (typeof state.energiaBassaDaMs !== 'number') state.energiaBassaDaMs = Date.now();
+      } else {
+        state.energiaBassaDaMs = null;
       }
     }
 
@@ -212,6 +242,10 @@ window.PETQ = window.PETQ || {};
     if (typeof state.igieneBassaDaMs === 'number' &&
         (oraMs - state.igieneBassaDaMs) >= MALUS_CONDIZIONI.igieneBassaOre * 3600000) {
       m += MALUS_CONDIZIONI.igieneBassaMalus;
+    }
+    if (typeof state.energiaBassaDaMs === 'number' &&
+        (oraMs - state.energiaBassaDaMs) >= MALUS_CONDIZIONI.energiaBassaOre * 3600000) {
+      m += MALUS_CONDIZIONI.energiaBassaMalus;
     }
     if (typeof state.poop === 'number' && state.poop >= MALUS_CONDIZIONI.poopSoglia) {
       m += MALUS_CONDIZIONI.poopMalus;

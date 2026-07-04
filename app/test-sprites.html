@@ -96,7 +96,7 @@
   <h2>Cartoline esiti missione — 17 scene, con pet campione per razza</h2>
   <div class="grid" id="grid-cartoline"></div>
 
-  <h2>Stanze — lab / ship × cucina / bagno / salone (con e senza poop)</h2>
+  <h2>Stanze — lab / ship × cucina / bagno / salone / camera (con e senza poop)</h2>
   <div class="grid" id="grid-stanze"></div>
 
   <h2>Mappa della città (tab Missioni) — attivi illuminati con pin, inCorso pulsante</h2>
@@ -309,7 +309,7 @@
     // ===== Stanze =====
     var gridStanze = document.getElementById("grid-stanze");
     var temi = ["lab", "ship"];
-    var stanzeNomi = ["cucina", "bagno", "salone"];
+    var stanzeNomi = ["cucina", "bagno", "salone", "camera"];
     var poopVariants = [0, 2];
     var roomW = PETQ.rooms._W || 112;
     var roomH = PETQ.rooms._H || 64;
@@ -336,7 +336,7 @@
     // ===== Mappa della città: tutti attivi / rosa di 4 / inCorso frame 0 e 1 =====
     var gridMappa = document.getElementById("grid-mappa");
     var mappaW = PETQ.rooms._MAPPA_W || 112;
-    var mappaH = PETQ.rooms._MAPPA_H || 96;
+    var mappaH = PETQ.rooms._MAPPA_H || 128;
     var mappaVarianti = [
       { label: "tutti attivi", stato: { attivi: ["m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"], inCorso: null, frame: 0 } },
       { label: "rosa di 4 (m1 m4 m5 m8)", stato: { attivi: ["m1", "m4", "m5", "m8"], inCorso: null, frame: 0 } },

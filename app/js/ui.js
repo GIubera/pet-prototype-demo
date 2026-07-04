@@ -15,14 +15,18 @@ window.PETQ = window.PETQ || {};
   // posizione del pet durante il lavaggio (dentro la vasca)
   var WASH_POS = { x: 8, y: 14 };
 
-  // hotzone letto (coordinate logiche stanza, salone): stesso rettangolo esposto da
-  // PETQ.rooms._letto.salone, riletto qui con fallback nel caso il modulo grafica non sia
-  // ancora caricato (stesso pattern difensivo di ROOM_W/ROOM_H sopra).
-  function hotzoneLetto() {
-    return (PETQ.rooms && PETQ.rooms._letto && PETQ.rooms._letto.salone) || { x: 17, y: 44, w: 22, h: 18 };
+  // hotzone letto (coordinate logiche stanza, camera — GDD "Casa": il letto e' stato spostato
+  // dal salone alla camera dedicata): rettangolo esposto da PETQ.rooms._letto.camera[tema],
+  // riletto qui con fallback nel caso il modulo grafica non sia ancora caricato (stesso
+  // pattern difensivo di ROOM_W/ROOM_H sopra). tema: 'lab'|'ship' (v. temaRazza).
+  function hotzoneLetto(tema) {
+    var perTema = PETQ.rooms && PETQ.rooms._letto && PETQ.rooms._letto.camera;
+    if (perTema && perTema[tema]) return perTema[tema];
+    return { x: 14, y: 20, w: 40, h: 30 };
   }
-  // posizione del pet mentre dorme A LETTO (dentro il rettangolo letto)
-  var SLEEP_BED_POS = { x: 12, y: 32 };
+  // posizione del pet mentre dorme A LETTO (dentro il rettangolo letto, camera: v. rooms.js
+  // LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA, entrambe abbastanza generose da ospitare questo punto)
+  var SLEEP_BED_POS = { x: 22, y: 30 };
   // posizione del pet mentre dorme CROLLATO (sul pavimento, al centro come l'idle normale)
   function sleepFloorPos() {
     return { x: Math.round((ROOM_W - PET_PX) / 2), y: ROOM_H - PET_PX - 4 };
@@ -388,7 +392,7 @@ window.PETQ = window.PETQ || {};
     wrap.appendChild(hud);
 
     var tabs = el('div', 'petq-tabs');
-    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['missioni', 'Missioni']];
+    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['camera', 'Camera'], ['missioni', 'Missioni']];
     for (var i = 0; i < stanze.length; i++) {
       (function (chiave, label) {
         var tab = el('button', 'petq-tab', label);
@@ -422,8 +426,8 @@ window.PETQ = window.PETQ || {};
     hotzone.style.height = (HOTZONE_VASCA.h / ROOM_H * 100) + '%';
     canvasWrap.appendChild(hotzone);
 
-    // hotzone letto: evidenziata durante il drag del pet nel salone (stesso pattern vasca)
-    var hzLetto = hotzoneLetto();
+    // hotzone letto: evidenziata durante il drag del pet in camera (stesso pattern vasca)
+    var hzLetto = hotzoneLetto(temaRazza(state.pet));
     var hotzoneL = el('div', 'petq-hotzone');
     hotzoneL.id = 'petq-hotzone-letto';
     hotzoneL.style.left = (hzLetto.x / ROOM_W * 100) + '%';
@@ -562,7 +566,7 @@ window.PETQ = window.PETQ || {};
       return { x: WASH_POS.x, y: WASH_POS.y };
     }
     if (currentState && currentState.sonno) {
-      if (currentState.sonno.aLetto && currentStanza === 'salone') {
+      if (currentState.sonno.aLetto && currentStanza === 'camera') {
         return { x: SLEEP_BED_POS.x, y: SLEEP_BED_POS.y };
       }
       return sleepFloorPos();
@@ -1048,7 +1052,7 @@ window.PETQ = window.PETQ || {};
       var dist = Math.sqrt(dx * dx + dy * dy);
 
       var puoTrascinare = canvasPointer.target === 'pet' && !currentState.sonno &&
-        (currentStanza === 'bagno' || currentStanza === 'salone');
+        (currentStanza === 'bagno' || currentStanza === 'camera');
       if (!canvasPointer.dragging && puoTrascinare && dist > 10) {
         canvasPointer.dragging = true;
         petDragging = true;
@@ -1083,7 +1087,8 @@ window.PETQ = window.PETQ || {};
         var p = coordLogiche(canvas, e.clientX, e.clientY);
         if (!annullato && currentStanza === 'bagno' && dentroRect(p, HOTZONE_VASCA, 0)) {
           avviaLavaggio();
-        } else if (!annullato && currentStanza === 'salone' && dentroRect(p, hotzoneLetto(), 0)) {
+        } else if (!annullato && currentStanza === 'camera' &&
+                   dentroRect(p, hotzoneLetto(temaRazza(currentState.pet)), 0)) {
           provaAndareALetto();
         } else {
           disegnaStanzaEPet(currentState);
@@ -1158,6 +1163,39 @@ window.PETQ = window.PETQ || {};
       var r = PETQ.care.wash(currentState);
       dopoAzione(r);
     });
+  }
+
+  // Drag del pet nel letto (camera, GDD "Energia e sonno"): prima delle 21 il pet rifiuta
+  // di dormire, e lo dice SEMPRE con un balloon (fix playtest 7a: mai silenzio). Dopo le 21,
+  // via libera: PETQ.pet.avviaSonno(state, true) marca aLetto cosi' il risveglio da' Energia
+  // piena dopo >=6h dormite (v. pet.js risolviRisveglio).
+  function provaAndareALetto() {
+    if (!currentState || !currentState.pet || currentState.sonno || currentState.missione) return;
+    var es = (PETQ.pet && PETQ.pet.bilEnergiaSonno) ? PETQ.pet.bilEnergiaSonno() : { oraLetto: 21 };
+    var oraAttuale = new Date().getHours();
+    if (oraAttuale < es.oraLetto) {
+      mostraBalloon(PETQ.dialog.say(currentState.pet, 'sonno', currentState) ||
+        ((currentState.pet.nome || 'Il pet') + ' non ha ancora sonno, è troppo presto.'));
+      disegnaStanzaEPet(currentState);
+      return;
+    }
+    PETQ.pet.avviaSonno(currentState, true);
+    PETQ.save.save(currentState);
+    disegnaStanzaEPet(currentState);
+    renderAzioni();
+    mostraBalloon(PETQ.dialog.say(currentState.pet, 'dormire', currentState));
+  }
+
+  // Tap sul pet mentre dorme: sveglia manuale, l'energia dipende da quante ore ha dormito
+  // (v. pet.js risolviRisveglio/svegliaManuale).
+  function eseguiSveglia() {
+    if (!currentState || !currentState.sonno) return;
+    var risultato = PETQ.pet.svegliaManuale(currentState);
+    PETQ.save.save(currentState);
+    disegnaStanzaEPet(currentState);
+    aggiornaHud(currentState);
+    renderAzioni();
+    if (risultato) mostraBalloon(PETQ.dialog.say(currentState.pet, risultato.battuta, currentState));
   }
 
   function eseguiFeed(cibo, cardEl, dispensaIdx) {
@@ -1255,8 +1293,23 @@ window.PETQ = window.PETQ || {};
 
     if (currentStanza === 'cucina') renderAzioniCucina(azioni);
     else if (currentStanza === 'bagno') renderAzioniBagno(azioni);
+    else if (currentStanza === 'camera') renderAzioniCamera(azioni);
     else if (currentStanza === 'missioni') renderTabMissioni(azioni);
     else renderAzioniSalone(azioni);
+  }
+
+  // --- camera: solo suggerimenti, l'azione è drag/tap sul canvas (letto/sveglia) ---
+
+  function renderAzioniCamera(container) {
+    var nome = currentState.pet.nome || 'il pet';
+    if (currentState.sonno) {
+      container.appendChild(el('p', 'petq-hint', nome + ' sta dormendo. Tocca per svegliarlo.'));
+    } else if (currentState.missione) {
+      container.appendChild(el('p', 'petq-hint', nome + ' è in missione: il letto aspetta il suo ritorno.'));
+    } else {
+      var es = (PETQ.pet && PETQ.pet.bilEnergiaSonno) ? PETQ.pet.bilEnergiaSonno() : { oraLetto: 21 };
+      container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire (dalle ' + es.oraLetto + ':00).'));
+    }
   }
 
   function trovaCibo(nome) {
@@ -1456,21 +1509,36 @@ window.PETQ = window.PETQ || {};
       container.appendChild(el('p', 'petq-hint', 'Tocca i bisogni per pulirli.'));
     }
 
-    // infermeria: visibile solo quando ci sono ferite
-    if ((currentState.ferite || 0) > 0) {
-      var costo = costoCura();
-      var btn = el('button', 'petq-btn', 'Cura (' + costo + ' monete)');
-      var motivo = null;
-      if (currentState.missione) motivo = nome + ' è in missione.';
-      else if (cureEsauriteOggi()) motivo = 'Cure di oggi esaurite, torna domani.';
-      else if ((currentState.coins || 0) < costo) motivo = 'Monete insufficienti.';
-      if (motivo) {
-        btn.disabled = true;
-        btn.title = motivo;
-      }
-      btn.addEventListener('click', avviaCura);
-      container.appendChild(btn);
+    // Infermeria (fix playtest 7c): la zona è SEMPRE visibile, con stato esplicito invece
+    // di sparire — "Nessuna ferita da curare" / "Cura — N monete" / "Cure finite per oggi".
+    container.appendChild(costruisciInfermeria(nome));
+  }
+
+  function costruisciInfermeria(nome) {
+    var wrap = el('div', 'petq-infermeria');
+    wrap.appendChild(el('div', 'petq-infermeria-titolo', 'Infermeria'));
+
+    var costo = costoCura();
+    var ferite = currentState.ferite || 0;
+
+    if (ferite <= 0) {
+      wrap.appendChild(el('p', 'petq-hint', 'Nessuna ferita da curare.'));
+      return wrap;
     }
+
+    var btn = el('button', 'petq-btn', 'Cura — ' + costo + ' monete');
+    var motivo = null;
+    if (currentState.missione) motivo = nome + ' è in missione.';
+    else if (cureEsauriteOggi()) motivo = 'Cure finite per oggi, torna domani.';
+    else if ((currentState.coins || 0) < costo) motivo = 'Monete insufficienti.';
+    if (motivo) {
+      btn.disabled = true;
+      btn.title = motivo;
+      wrap.appendChild(el('p', 'petq-hint', motivo));
+    }
+    btn.addEventListener('click', avviaCura);
+    wrap.appendChild(btn);
+    return wrap;
   }
 
   // Costo cura mostrato in UI: dalla config se un giorno verrà mappata
@@ -1719,6 +1787,11 @@ window.PETQ = window.PETQ || {};
       return;
     }
 
+    if (missioneEsauritaOggi()) {
+      container.appendChild(el('p', 'petq-hint', 'Missione di oggi completata: torna domani per una nuova rosa.'));
+      return;
+    }
+
     container.appendChild(el('p', 'petq-hint', 'La rosa di oggi: scegli una missione e mandaci ' + (currentState.pet.nome || 'il pet') + '.'));
 
     var rosa = PETQ.missions.rosaDelGiorno(currentState);
@@ -1733,6 +1806,13 @@ window.PETQ = window.PETQ || {};
 
   // --- mappa della città ---
 
+  // Limite 1 missione al giorno (fix playtest): missions.avvia() rifiuta comunque, questo è
+  // solo per la UI (mappa senza pin attivi + hint dedicato). Il tutorial M0 non conta (non
+  // passa da missioneGiorno, v. missions.js risolviTutorial).
+  function missioneEsauritaOggi() {
+    return !!currentState.missioneGiorno && currentState.missioneGiorno === oggiStr();
+  }
+
   // Stato corrente della mappa: quali pin sono attivi/tappabili, quale luogo è "in corso",
   // e le schede per costruire il pannello dettaglio.
   function statoMappa() {
@@ -1742,6 +1822,9 @@ window.PETQ = window.PETQ || {};
     }
     if (currentState.missione) {
       return { attivi: [], inCorso: currentState.missione.id, tutorial: null, rosa: [] };
+    }
+    if (missioneEsauritaOggi()) {
+      return { attivi: [], inCorso: null, tutorial: null, rosa: [], esaurita: true };
     }
     var rosa = PETQ.missions.rosaDelGiorno(currentState) || [];
     var attivi = [];
@@ -1756,8 +1839,12 @@ window.PETQ = window.PETQ || {};
     var hint;
     if (sm.inCorso) hint = nome + ' è in giro per la città: eccolo sulla mappa.';
     else if (sm.tutorial) hint = 'Primo giorno: tocca il pin del negozio di giocattoli.';
+    else if (sm.esaurita) hint = 'Missione di oggi completata: torna domani per una nuova rosa.';
     else hint = 'Scegli una destinazione per ' + nome + '.';
     container.appendChild(el('p', 'petq-hint', hint));
+
+    var mappaWrap = el('div', 'petq-mappa-wrap');
+    mappaWrap.id = 'petq-mappa-wrap';
 
     var canvas = document.createElement('canvas');
     canvas.id = 'petq-canvas-mappa';
@@ -1765,7 +1852,8 @@ window.PETQ = window.PETQ || {};
     canvas.width = PETQ.rooms._MAPPA_W;
     canvas.height = PETQ.rooms._MAPPA_H;
     canvas.style.aspectRatio = PETQ.rooms._MAPPA_W + ' / ' + PETQ.rooms._MAPPA_H;
-    container.appendChild(canvas);
+    mappaWrap.appendChild(canvas);
+    container.appendChild(mappaWrap);
 
     var dettaglio = el('div', 'petq-mappa-dettaglio');
     dettaglio.id = 'petq-mappa-dettaglio';
@@ -1774,6 +1862,7 @@ window.PETQ = window.PETQ || {};
 
     installaPointerMappa(canvas);
     ridisegnaMappa();
+    aggiornaEtichetteMappa(sm);
     aggiornaDettaglioMappa(sm);
   }
 
@@ -1783,6 +1872,40 @@ window.PETQ = window.PETQ || {};
     if (!canvas || !currentState) return;
     var sm = statoMappa();
     PETQ.rooms.drawMappa(canvas, { attivi: sm.attivi, inCorso: sm.inCorso, frame: idleFrame });
+  }
+
+  // Etichette col nome sui luoghi attivi (fix playtest, GDD "Mappa leggibilità"): overlay HTML
+  // posizionati in percentuale sui rettangoli pin (stessa tecnica delle hotzone stanza),
+  // chip piccole semi-trasparenti con testo nitido — la pixel art da sola non basta a
+  // riconoscere i luoghi. Nomi brevi indipendenti dal titolo scheda (che può cambiare).
+  var NOME_BREVE_LUOGO = {
+    m0: 'Negozio', m1: 'Sala Giochi', m2: 'Parco', m3: 'Dojo', m4: 'Biblioteca',
+    m5: 'Industria', m6: 'Studio TV', m7: 'Fogne', m8: 'Neon Ave'
+  };
+
+  function aggiornaEtichetteMappa(sm) {
+    var wrap = document.getElementById('petq-mappa-wrap');
+    if (!wrap) return;
+    var esistenti = wrap.querySelectorAll('.petq-mappa-etichetta');
+    for (var r = 0; r < esistenti.length; r++) esistenti[r].remove();
+
+    var pins = (PETQ.rooms && PETQ.rooms._mappaPins) || {};
+    var attivi = (sm && sm.attivi) || [];
+    var mw = PETQ.rooms._MAPPA_W, mh = PETQ.rooms._MAPPA_H;
+
+    for (var i = 0; i < attivi.length; i++) {
+      var id = attivi[i];
+      var rect = pins[id];
+      var nomeBreve = NOME_BREVE_LUOGO[id];
+      if (!rect || !nomeBreve) continue;
+
+      var chip = el('div', 'petq-mappa-etichetta', nomeBreve);
+      var cx = rect.x + rect.w / 2;
+      var yTop = Math.max(0, rect.y - 2); // appena sopra il luogo/pin, dentro il canvas
+      chip.style.left = (cx / mw * 100) + '%';
+      chip.style.top = (yTop / mh * 100) + '%';
+      wrap.appendChild(chip);
+    }
   }
 
   function aggiornaDettaglioMappa(sm) {
@@ -2230,6 +2353,59 @@ window.PETQ = window.PETQ || {};
       }
     });
     panel.appendChild(fineMissBtn);
+
+    // Debug "Nuovo giorno" (fix playtest, limite 1 missione/giorno): azzera tutti i contatori
+    // giornalieri e fa scattare il dailyLogin, cosi' si puo' testare il reset senza aspettare
+    // la mezzanotte reale.
+    var nuovoGiornoBtn = el('button', 'petq-btn petq-btn-mini', 'Nuovo giorno');
+    nuovoGiornoBtn.addEventListener('click', function () {
+      if (!currentState) return;
+      currentState.missioneGiorno = null;
+      currentState.trainDay = null;
+      currentState.wordDay = null;
+      currentState.coccoleDay = null;
+      currentState.coccoleCount = 0;
+      currentState.cureDay = null;
+      currentState.cureOggi = 0;
+      currentState.categoriePastiOggi = [];
+      currentState.lastLoginDay = null;
+      if (PETQ.care && PETQ.care.dailyLogin) PETQ.care.dailyLogin(currentState);
+      PETQ.save.save(currentState);
+      aggiornaHud(currentState);
+      renderAzioni();
+      mostraToast('Nuovo giorno simulato.');
+    });
+    panel.appendChild(nuovoGiornoBtn);
+
+    // Debug "Forza nanna" (fix playtest 7a): manda a letto il pet SUBITO, a qualsiasi ora,
+    // bypassando la soglia oraLetto (utile per testare il ciclo sonno senza aspettare le 21).
+    var forzaNannaBtn = el('button', 'petq-btn petq-btn-mini', 'Forza nanna');
+    forzaNannaBtn.addEventListener('click', function () {
+      if (!currentState || !PETQ.pet) return;
+      if (currentState.sonno) {
+        mostraToast((currentState.pet && currentState.pet.nome || 'Il pet') + ' sta già dormendo.');
+        return;
+      }
+      PETQ.pet.avviaSonno(currentState, true);
+      PETQ.save.save(currentState);
+      disegnaStanzaEPet(currentState);
+      renderAzioni();
+      mostraToast('A nanna, subito.');
+    });
+    panel.appendChild(forzaNannaBtn);
+
+    // Debug "Ferite +20" (fix playtest 7c): per testare il flusso infermeria senza aspettare
+    // un fallimento missione.
+    var feriteBtn = el('button', 'petq-btn petq-btn-mini', 'Ferite +20');
+    feriteBtn.addEventListener('click', function () {
+      if (!currentState) return;
+      currentState.ferite = Math.min(100, (currentState.ferite || 0) + 20);
+      if (currentState.pet && PETQ.pet) PETQ.pet.recomputeSalute(currentState.pet, currentState);
+      PETQ.save.save(currentState);
+      aggiornaHud(currentState);
+      renderAzioni();
+    });
+    panel.appendChild(feriteBtn);
 
     var resetBtn = el('button', 'petq-btn petq-btn-mini petq-btn-danger', 'Reset save');
     resetBtn.addEventListener('click', function () {

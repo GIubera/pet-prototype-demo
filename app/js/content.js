@@ -31,11 +31,11 @@ window.PETQ = window.PETQ || {};
     'sonno', 'dormire', 'sveglia', 'dormito_male'];
 
   var DEFAULT_BILANCIAMENTO = {
-    decadimento: { fame: 6, igiene: 3, felicita: 2 },
+    decadimento: { fame: 6, igiene: 8, felicita: 2 },
     soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
     economia: { login: 10, monetePartenza: 50 },
     allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
-    iniziali: { benessere: 70, base: 0, firma: 1 },
+    iniziali: { benessere: 70, budget: 3, firma: 1 },
     energia_sonno: {
       decadimento: 4,
       costoMissionePerOra: 8,
@@ -915,11 +915,14 @@ window.PETQ = window.PETQ || {};
     var valBenessere = numeroDaEtichetta('benessere', 0);
     if (valBenessere !== null) { out.iniziali.benessere = valBenessere; trovatoAlmenoUno = true; }
 
-    // riga "RPG | 5 punti base + 2d4 casuali per stat, poi +3 alla stat firma": primo numero = base, ultimo = firma
+    // riga "RPG | budget di 3 punti base ... poi +1 alla stat firma"
+    // FORMATO CONTRATTUALE (GDD "Alla nascita", playtest v2): la riga contiene "punti base";
+    // il PRIMO numero della riga = budget totale da distribuire a caso (impilabile),
+    // l'ULTIMO numero = bonus alla stat firma. Totale iniziale = budget + firma.
     var rigaRpg = trovaRiga('punti base');
     if (rigaRpg) {
       var numsRpg = tuttiINumeri(rigaRpg);
-      if (numsRpg.length >= 1) { out.iniziali.base = numsRpg[0]; trovatoAlmenoUno = true; }
+      if (numsRpg.length >= 1) { out.iniziali.budget = numsRpg[0]; trovatoAlmenoUno = true; }
       if (numsRpg.length >= 2) { out.iniziali.firma = numsRpg[numsRpg.length - 1]; }
     }
 

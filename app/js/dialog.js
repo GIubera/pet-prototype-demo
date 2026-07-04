@@ -16,14 +16,27 @@ window.PETQ = window.PETQ || {};
       .replace(/\{parola\}/g, parola);
   }
 
+  // situazioni "contestuali" in cui il pet puo' usare spontaneamente una parola insegnata
+  // (GDD "Parola insegnata", fix playtest): saluto, felice — cioe' saluto/coccola/battuta
+  // automatica. MAI negli esiti missione ne' nelle situazioni critiche (fame/sporco/triste).
+  var SITUAZIONI_PAROLA = { saluto: true, felice: true };
+  var PROB_PAROLA = 0.2;
+
   function say(pet, situazione, state) {
     if (!pet) return '...';
 
     var data = window.PETQ.content && window.PETQ.content.data;
     var personalita = pet.personalita || 'gentile';
-    var pool = data && data.personalita && data.personalita[personalita]
-      ? data.personalita[personalita][situazione]
-      : null;
+    var pools = data && data.personalita && data.personalita[personalita];
+
+    // ~20% delle battute contestuali pescano dal pool 'parola' se il giocatore
+    // ha insegnato almeno una parola ({parola} = una a caso tra le insegnate)
+    if (SITUAZIONI_PAROLA[situazione] && state && state.parole && state.parole.length > 0 &&
+        pools && pools.parola && pools.parola.length > 0 && PETQ.rng.rand() < PROB_PAROLA) {
+      situazione = 'parola';
+    }
+
+    var pool = pools ? pools[situazione] : null;
 
     if (!pool || pool.length === 0) return '...';
 

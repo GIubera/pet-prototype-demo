@@ -222,8 +222,78 @@ window.PETQ = window.PETQ || {};
     O(g, 18, 48, 50, 12, L.tappetoBordo, L.tappeto);
     R(g, 20, 51, 46, 1, L.tappetoRiga);
     R(g, 20, 56, 46, 1, L.tappetoRiga);
-    labLetto(g);
     mensolaSalone(g, "lab");
+  }
+
+  // Camera da letto (GDD "Casa" -> camera, playtest 4 lug 2026): 4a stanza, il letto qui
+  // e' GRANDE e protagonista (era troppo piccolo nel salone). Comodino a fianco, finestra
+  // sopra la testiera. TODO feature futura: il diario della giornata (testi del socio) va
+  // appeso/appoggiato qui, probabilmente sul comodino o a muro sopra di esso.
+  // Rettangoli letto (anche hotzone drag per la UI, pattern HOTZONE_VASCA): generosi,
+  // protagonisti della scena, forma diversa per lab (capsula medicale) e ship (cupola).
+  var LETTO_LAB_CAMERA = { x: 14, y: 20, w: 40, h: 30 };
+  var LETTO_SHIP_CAMERA = { x: 14, y: 18, w: 40, h: 32 };
+
+  function labCameraLetto(g) {
+    var r = LETTO_LAB_CAMERA;
+    // gambe/base capsula
+    R(g, r.x + 2, r.y + r.h - 4, 3, 4, L.metalloScuro);
+    R(g, r.x + r.w - 5, r.y + r.h - 4, 3, 4, L.metalloScuro);
+    // scocca della capsula medicale, ampia e accogliente
+    O(g, r.x, r.y + 4, r.w, r.h - 8, L.out, L.metallo);
+    R(g, r.x + 2, r.y + 6, r.w - 4, r.h - 14, L.metalloChiaro);
+    // cupola/vetro superiore semiaperta
+    O(g, r.x + 4, r.y, r.w - 8, 10, L.out, L.specchio);
+    R(g, r.x + 6, r.y + 2, r.w - 16, 3, L.riflesso);
+    // cuscino + coperta ben visibili dentro la capsula
+    O(g, r.x + 4, r.y + 9, 12, 7, L.out, L.crema);
+    R(g, r.x + 4, r.y + 16, r.w - 8, r.h - 22, L.divano);
+    R(g, r.x + 4, r.y + 16, r.w - 8, 2, L.divanoChiaro);
+    // led di stato sulla scocca
+    R(g, r.x + 3, r.y + r.h - 10, 3, 2, L.led);
+  }
+  function labCamera(g) {
+    labWall(g, false);
+    // finestra sopra la testiera del letto
+    O(g, 6, 6, 20, 14, L.out, L.cielo);
+    R(g, 15, 7, 1, 12, L.out);
+    R(g, 9, 10, 4, 1, L.nuvola);
+    labCameraLetto(g);
+    // comodino a fianco del letto con lampada
+    O(g, 78, 30, 16, 14, L.out, L.crema);
+    R(g, 79, 36, 14, 1, L.cremaOmbra);
+    R(g, 83, 22, 2, 8, L.metalloScuro);
+    O(g, 80, 18, 8, 6, L.out, L.ambra);
+    // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
+  }
+
+  // Letto ship-camera: capsula cupola sospesa, piu' grande della versione salone precedente
+  function shipCameraLetto(g) {
+    var r = LETTO_SHIP_CAMERA;
+    // base/piedistallo
+    R(g, r.x + 3, r.y + r.h - 5, r.w - 6, 5, S.mobiletto);
+    R(g, r.x + 5, r.y + r.h - 3, r.w - 10, 2, S.mobilettoTop);
+    // scocca capsula-navicella
+    O(g, r.x, r.y + 3, r.w, r.h - 10, S.out, S.metallo);
+    R(g, r.x + 2, r.y + 5, r.w - 4, r.h - 16, S.mobiletto);
+    // cupola trasparente in cima, con stelle
+    O(g, r.x + 5, r.y, r.w - 10, 9, S.out, S.metalloChiaro);
+    R(g, r.x + 7, r.y + 1, r.w - 14, 6, S.spazio);
+    stars(g, r.x + 7, r.y + 1, r.w - 14, 6, S.stella);
+    // giaciglio energetico interno + led
+    R(g, r.x + 4, r.y + 12, r.w - 8, r.h - 20, S.sportello);
+    R(g, r.x + 5, r.y + 13, 4, 2, S.ledC);
+    R(g, r.x + r.w - 9, r.y + r.h - 9, 4, 2, S.ledM);
+  }
+  function shipCamera(g) {
+    shipWall(g, S_WALLS.salone);
+    oblo(g, 8, 6, 18, 13);
+    shipCameraLetto(g);
+    // comodino luminoso a fianco
+    O(g, 78, 30, 16, 14, S.out, S.mobiletto);
+    R(g, 80, 36, 12, 1, S.glow);
+    ledPanel(g, 82, 18);
+    // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
   }
 
   // Mensola a muro del salone + zona ganci/quadri accanto (supporti collezione, GDD -> Casa).
@@ -256,23 +326,6 @@ window.PETQ = window.PETQ || {};
       R(g, 44, 6, 2, 2, S.metalloChiaro); // ganci
       R(g, 49, 6, 2, 2, S.metalloChiaro);
     }
-  }
-
-  // Letto (GDD "Energia e sonno"): brandina metallica con cuscino, incastrata tra lo slot
-  // arredo di sinistra (SLOT_SPOTS.salone[0], x:2-16) e il pet al centro (x:40+). Coordinate
-  // esposte in PETQ.rooms._letto.salone per l'hotzone drag della UI.
-  function labLetto(g) {
-    var r = LETTO_SALONE;
-    // gambe metalliche
-    R(g, r.x + 1, r.y + r.h - 3, 2, 3, L.metalloScuro);
-    R(g, r.x + r.w - 3, r.y + r.h - 3, 2, 3, L.metalloScuro);
-    // telaio brandina
-    O(g, r.x, r.y + 6, r.w, r.h - 9, L.out, L.metallo);
-    R(g, r.x + 2, r.y + 8, r.w - 4, r.h - 13, L.metalloChiaro);
-    // cuscino
-    O(g, r.x + 2, r.y + 2, 9, 7, L.out, L.crema);
-    // testiera
-    R(g, r.x, r.y + 3, 2, r.h - 6, L.metalloScuro);
   }
 
   // ===== SHIP (stessi slot, skin sci-fi; oblò con stelle e palette parete diversa in ogni stanza) =====
@@ -380,27 +433,12 @@ window.PETQ = window.PETQ || {};
     O(g, 18, 48, 50, 12, S.out, S.pad);
     R(g, 20, 49, 46, 1, S.glow);
     R(g, 20, 58, 46, 1, S.glow);
-    shipLetto(g);
     mensolaSalone(g, "ship");
   }
 
-  // Letto ship (GDD "Energia e sonno"): capsula/amaca sospesa tra due montanti, stessa
-  // posizione/hotzone del lab (v. LETTO_SALONE) per coerenza di layout tra le due razze.
-  function shipLetto(g) {
-    var r = LETTO_SALONE;
-    // montanti
-    R(g, r.x, r.y, 2, r.h, S.metalloChiaro);
-    R(g, r.x + r.w - 2, r.y, 2, r.h, S.metalloChiaro);
-    // capsula sospesa (sacco energetico) con glow
-    O(g, r.x + 1, r.y + 5, r.w - 2, r.h - 8, S.out, S.mobiletto);
-    R(g, r.x + 3, r.y + 7, r.w - 6, r.h - 12, S.sportello);
-    R(g, r.x + 4, r.y + 8, 3, 2, S.ledC);
-    R(g, r.x + r.w - 7, r.y + r.h - 6, 3, 2, S.ledM);
-  }
-
   var BUILDERS = {
-    lab: { cucina: labCucina, bagno: labBagno, salone: labSalone },
-    ship: { cucina: shipCucina, bagno: shipBagno, salone: shipSalone }
+    lab: { cucina: labCucina, bagno: labBagno, salone: labSalone, camera: labCamera },
+    ship: { cucina: shipCucina, bagno: shipBagno, salone: shipSalone, camera: shipCamera }
   };
 
   // ===== Poop: piccolo sprite marrone a terra, 1-3 in base a stato.poop =====
@@ -415,19 +453,24 @@ window.PETQ = window.PETQ || {};
     }
   }
 
-  // ===== Mappa della città (tab Missioni): 112x96, notte, 9 luoghi + strade =====
+  // ===== Mappa della città (tab Missioni): 144x128, crepuscolo, 9 luoghi + strade =====
+  // Fix playtest "Mappa leggibilità": scena schiarita rispetto alla notte piena originale,
+  // cosi' gli edifici a silhouette grande restano a contrasto invece di sparire nel buio.
   // Unica per entrambe le razze: è la città, non la casa.
   var MAPPA_W = 144, MAPPA_H = 128;
 
+  // Palette mappa a CREPUSCOLO (fix playtest, GDD "Mappa leggibilità"): piu' chiara della
+  // notte piena di prima, cosi' gli edifici (a silhouette grande) restano a contrasto sul
+  // cielo della sera invece di sparire nel quasi-nero.
   var M = {
-    fondo: "#12161f", isolato: "#1a2030",
-    strada: "#272e40", corsia: "#4a5268", marciapiede: "#333b50",
-    lastricato: "#252c3d", lastricatoChiaro: "#2e3547",
-    lampione: "#4a5268", lampLuce: "#f8e05a", lampAlone: "#4a4430",
-    zebra: "#c9d2dc",
+    fondo: "#2a3350", isolato: "#333d5c",
+    strada: "#3d4666", corsia: "#6c7796", marciapiede: "#4b5578",
+    lastricato: "#3c4562", lastricatoChiaro: "#485272",
+    lampione: "#6c7796", lampLuce: "#f8e05a", lampAlone: "#5c5638",
+    zebra: "#d8dfe8",
     pinOut: "#3a3208", pinFill: "#f0c832", pinBright: "#ffe066", pinLuce: "#fff6c0",
-    // toni "spento" condivisi
-    dimMuro: "#262a38", dimScuro: "#1e222e", dimChiaro: "#333a4a", dimFinestra: "#252b3a"
+    // toni "spento" condivisi: piu' chiari di prima ma ancora chiaramente desaturati/spenti
+    dimMuro: "#3a4058", dimScuro: "#323952", dimChiaro: "#484f6c", dimFinestra: "#383f58"
   };
 
   // rettangoli logici dei 9 luoghi (hit-test per la UI, generosi, min 16x14)
@@ -801,13 +844,16 @@ window.PETQ = window.PETQ || {};
   var SLOT_SPOTS = {
     cucina: [[24, 48], [70, 48], [96, 47]],
     bagno:  [[24, 48], [66, 46], [32, 8]],
-    salone: [[26, 0], [40, 4], [2, 46]]
+    salone: [[26, 0], [40, 4], [2, 46]],
+    // camera: solo 2 slot (pavimento + muro), il letto e' gia' il pezzo forte della stanza
+    camera: [[96, 46], [58, 4]]
   };
   // tipo di supporto di ogni slot, nello stesso ordine di SLOT_SPOTS
   var SLOT_TIPI = {
     cucina: ["pavimento", "pavimento", "pavimento"],
     bagno:  ["pavimento", "pavimento", "pavimento"],
-    salone: ["mensola", "muro", "pavimento"]
+    salone: ["mensola", "muro", "pavimento"],
+    camera: ["pavimento", "muro"]
   };
 
   // supporto naturale di ogni arredo (chiavi normalizzate); tutto il resto -> pavimento
@@ -829,12 +875,6 @@ window.PETQ = window.PETQ || {};
     if (ARREDO_SUPPORTO[k]) return ARREDO_SUPPORTO[k];
     return "pavimento"; // topo, fallback e sconosciuti stanno a terra
   }
-
-  // Letto del salone (GDD "Energia e sonno"): incastrato tra lo slot arredo di sinistra
-  // (SLOT_SPOTS.salone[0] finisce a x=16) e il pet al centro stanza (x:40-72 circa), sotto
-  // il divano/seduta (che finiscono a y:40-42). Stesso rettangolo per lab e ship: e' anche
-  // l'hotzone drag esposta alla UI (pattern HOTZONE_VASCA).
-  var LETTO_SALONE = { x: 17, y: 44, w: 22, h: 18 };
 
   var A_OUT = "#241c14";
 
@@ -1122,8 +1162,8 @@ window.PETQ = window.PETQ || {};
             console.error("PETQ.rooms: slot sovrapposti " + stanza + "[" + i + "]/[" + j + "]");
           }
         }
-        if (stanza === "salone" && overlap(boxes[i], LETTO_SALONE)) {
-          console.error("PETQ.rooms: slot salone[" + i + "] si sovrappone al letto");
+        if (stanza === "camera" && (overlap(boxes[i], LETTO_LAB_CAMERA) || overlap(boxes[i], LETTO_SHIP_CAMERA))) {
+          console.error("PETQ.rooms: slot camera[" + i + "] si sovrappone al letto");
         }
       }
       if ((SLOT_TIPI[stanza] || []).length !== SLOT_SPOTS[stanza].length) {
@@ -1189,9 +1229,10 @@ window.PETQ = window.PETQ || {};
     _slotTipi: SLOT_TIPI,
     _arredoSupporto: ARREDO_SUPPORTO,
     _assertSlots: assertSlots,
-    _letto: { salone: LETTO_SALONE },
+    // hotzone letto per tema (GDD "Casa" -> camera): la UI sceglie in base a temaRazza(pet)
+    _letto: { camera: { lab: LETTO_LAB_CAMERA, ship: LETTO_SHIP_CAMERA } },
     _arredi: Object.keys(ARREDI),
     _temi: Object.keys(BUILDERS),
-    _stanze: ["cucina", "bagno", "salone"]
+    _stanze: ["cucina", "bagno", "salone", "camera"]
   };
 })();
