@@ -1,0 +1,762 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #14161c;
+  color: #eceff2;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #1c1f27;
+  padding: 16px;
+  padding-bottom: 90px;
+}
+
+button {
+  font-family: inherit;
+}
+
+.petq-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.petq-title {
+  font-size: 24px;
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.petq-sub {
+  text-align: center;
+  color: #a7adba;
+  margin: 0;
+}
+
+/* ---------- Intro / uova ---------- */
+
+.petq-uova {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.petq-uovo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #262b35;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.petq-uovo-box:active {
+  border-color: #5aa8e8;
+}
+
+.petq-uovo-canvas {
+  image-rendering: pixelated;
+  width: 96px;
+  height: 96px;
+}
+
+.petq-uovo-label {
+  font-weight: 600;
+}
+
+/* ---------- Nascita ---------- */
+
+.petq-nascita {
+  align-items: center;
+  text-align: center;
+}
+
+.petq-sprite-grande {
+  image-rendering: pixelated;
+  width: 128px;
+  height: 128px;
+  background: #262b35;
+  border-radius: 12px;
+}
+
+.petq-personalita {
+  font-size: 18px;
+  font-weight: 700;
+  color: #7fd8a4;
+}
+
+.petq-stats-grid {
+  width: 100%;
+  background: #262b35;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.petq-stat-riga {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #333a46;
+}
+
+.petq-stat-riga:last-child { border-bottom: none; }
+
+.petq-form-nome {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.petq-label {
+  color: #a7adba;
+  font-size: 14px;
+}
+
+.petq-input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #3a4150;
+  background: #14161c;
+  color: #eceff2;
+  font-size: 16px;
+}
+
+.petq-input-piccolo {
+  flex: 1;
+}
+
+.petq-errore {
+  color: #e85a78;
+  min-height: 18px;
+  font-size: 13px;
+}
+
+/* ---------- Bottoni ---------- */
+
+.petq-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #3a4150;
+  color: #eceff2;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.petq-btn:active { background: #4a5364; }
+
+.petq-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.petq-btn-primario {
+  background: #3ee6d0;
+  color: #0d1a17;
+}
+
+.petq-btn-primario:active { background: #35c9b6; }
+
+.petq-btn-piccolo {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.petq-btn-mini {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.petq-btn-danger {
+  background: #e85a78;
+  color: #2a0f14;
+}
+
+/* ---------- Casa ---------- */
+
+.petq-casa {
+  gap: 10px;
+}
+
+.petq-hud {
+  background: #262b35;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.petq-barra-riga {
+  display: grid;
+  grid-template-columns: 60px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.petq-barra-label { color: #a7adba; }
+
+.petq-barra-traccia {
+  background: #14161c;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.petq-barra-fill {
+  height: 100%;
+  border-radius: 6px;
+}
+
+.petq-barra-verde { background: #4cd97b; }
+.petq-barra-gialla { background: #e8c84c; }
+.petq-barra-rossa { background: #e85a5a; }
+
+.petq-barra-val { text-align: right; color: #ccd2db; }
+
+/* riga stat RPG: più bassa e discreta delle barre benessere */
+.petq-rpg-chips {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid #333a46;
+}
+
+.petq-rpg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #ccd2db;
+}
+
+.petq-chip-icon {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+
+.petq-chip-val {
+  font-weight: 700;
+}
+
+.petq-chip-bonus {
+  color: #3ee6d0;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.petq-monete {
+  margin-top: 4px;
+  font-weight: 700;
+  color: #e8c84c;
+  text-align: right;
+}
+
+.petq-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.petq-tab {
+  flex: 1;
+  padding: 10px 0;
+  background: #262b35;
+  border: none;
+  border-radius: 8px;
+  color: #a7adba;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.petq-tab-attiva {
+  background: #3ee6d0;
+  color: #0d1a17;
+}
+
+.petq-stanza-area {
+  display: flex;
+  justify-content: center;
+}
+
+.petq-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.petq-canvas-stanza {
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 112 / 64;
+  border-radius: 10px;
+  display: block;
+  touch-action: none; /* drag pet / tap poop gestiti via Pointer Events */
+}
+
+.petq-hotzone {
+  position: absolute;
+  border: 2px dashed transparent;
+  border-radius: 6px;
+  pointer-events: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.petq-hotzone-attiva {
+  border-color: #3ee6d0;
+  background: rgba(62, 230, 208, 0.14);
+}
+
+.petq-balloon {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #eceff2;
+  color: #14161c;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  max-width: 85%;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.petq-azioni {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #262b35;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.petq-riga-azione {
+  display: flex;
+  gap: 8px;
+}
+
+.petq-hint {
+  color: #a7adba;
+  font-size: 12px;
+  margin: 0;
+}
+
+/* ---------- Cucina: barra cibi orizzontale ---------- */
+
+.petq-food-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.petq-food-card {
+  flex: 0 0 auto;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #14161c;
+  border-radius: 8px;
+  padding: 8px 4px 6px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x; /* swipe orizzontale = scroll barra; drag verticale = trascina cibo */
+}
+
+.petq-food-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.petq-food-nome {
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+  color: #ccd2db;
+  max-width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.petq-food-costo {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8c84c;
+  pointer-events: none;
+}
+
+.petq-food-costo-no { color: #e85a5a; }
+
+.petq-food-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #14161c;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.petq-cibo-nome { font-weight: 600; }
+
+.petq-cibo-effetti {
+  color: #a7adba;
+  font-size: 12px;
+}
+
+.petq-vuoto {
+  color: #a7adba;
+  text-align: center;
+}
+
+/* ---------- Salone: card allenamento ---------- */
+
+.petq-train-cards {
+  display: flex;
+  gap: 6px;
+}
+
+.petq-train-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #14161c;
+  border-radius: 8px;
+  padding: 10px 2px 8px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.petq-train-card:active { background: #1e242e; }
+
+.petq-train-card-usata {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.petq-train-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.petq-train-label {
+  font-size: 10px;
+  color: #ccd2db;
+  pointer-events: none;
+}
+
+.petq-train-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: #eceff2;
+  pointer-events: none;
+}
+
+/* ---------- Drag ghost, shake, toast ---------- */
+
+.petq-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.85;
+  display: none;
+}
+
+.petq-ghost canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+@keyframes petq-shake-kf {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.petq-shake {
+  animation: petq-shake-kf 0.4s ease;
+}
+
+.petq-toast {
+  position: fixed;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: #0d0f14;
+  color: #eceff2;
+  border: 1px solid #3a4150;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 1001;
+  max-width: 90%;
+  text-align: center;
+}
+
+.petq-toast-visibile {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- Missioni ---------- */
+
+.petq-missione-ind {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(13, 15, 20, 0.85);
+  color: #3ee6d0;
+  border: 1px solid #3ee6d0;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.petq-canvas-mappa {
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+  touch-action: manipulation; /* tap sui pin, niente zoom da doppio tap */
+  cursor: pointer;
+}
+
+.petq-mappa-dettaglio {
+  display: flex;
+  flex-direction: column;
+}
+
+.petq-missione-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #14161c;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.petq-missione-card-corso {
+  border: 1px solid #3ee6d0;
+}
+
+.petq-missione-titolo {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.petq-missione-meta {
+  color: #a7adba;
+  font-size: 12px;
+}
+
+.petq-missione-reward {
+  color: #e8c84c;
+  font-size: 12px;
+}
+
+.petq-missione-countdown-riga {
+  font-size: 14px;
+  color: #eceff2;
+}
+
+.petq-missione-countdown {
+  font-weight: 700;
+  color: #3ee6d0;
+}
+
+.petq-missione-quote {
+  color: #ccd2db;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ---------- Schermata esito ---------- */
+
+.petq-esito {
+  align-items: stretch;
+}
+
+.petq-cartolina {
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 112 / 64;
+  border-radius: 10px;
+  display: block;
+  border: 2px solid #3a4150;
+}
+
+.petq-esito-testo {
+  background: #262b35;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #eceff2;
+}
+
+.petq-esito-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #262b35;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.petq-reward-riga {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.petq-reward-icona {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+  flex: 0 0 auto;
+}
+
+.petq-reward-testo {
+  font-size: 13px;
+}
+
+/* ---------- Collezione arredi ---------- */
+
+.petq-collezione {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #14161c;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.petq-arredo-riga {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #1c1f27;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.petq-arredo-info {
+  min-width: 0;
+}
+
+.petq-arredo-nome {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.petq-arredo-dett {
+  color: #a7adba;
+  font-size: 11px;
+}
+
+.petq-arredo-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* ---------- Ferite (HUD) e dispensa ---------- */
+
+.petq-ferite {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #e88a8a;
+}
+
+.petq-ferite-icona {
+  color: #e85a5a;
+  text-shadow: 1px 1px 0 #14161c;
+}
+
+.petq-ferite-num {
+  font-weight: 700;
+}
+
+.petq-food-card-dispensa {
+  border: 1px dashed #7fd8a4;
+}
+
+.petq-food-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #7fd8a4;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* ---------- Debug panel ---------- */
+
+.petq-debug {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0d0f14;
+  border-top: 2px solid #3ee6d0;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  z-index: 999;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.petq-debug-label {
+  align-self: center;
+  color: #a7adba;
+  font-size: 11px;
+  margin-right: 4px;
+}

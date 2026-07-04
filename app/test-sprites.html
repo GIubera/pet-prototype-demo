@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Galleria sprite e stanze — Pet Prototype</title>
+<style>
+  body {
+    background: #20242c;
+    color: #e8e8e8;
+    font-family: system-ui, sans-serif;
+    padding: 16px;
+  }
+  h1 { font-size: 20px; }
+  h2 {
+    font-size: 15px;
+    margin-top: 32px;
+    border-bottom: 1px solid #444c58;
+    padding-bottom: 4px;
+  }
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .cell {
+    background: #2c313c;
+    border: 1px solid #444c58;
+    border-radius: 6px;
+    padding: 6px;
+    text-align: center;
+    width: 108px;
+  }
+  .cell canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #10131a;
+    display: block;
+    margin: 0 auto 4px;
+  }
+  .cell .label {
+    font-size: 10px;
+    line-height: 1.3;
+    color: #b8c0cc;
+    word-break: break-word;
+  }
+  .room-cell {
+    width: auto;
+  }
+  #check-result {
+    margin: 12px 0;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: bold;
+  }
+  .ok { background: #204a2e; color: #7fe89c; }
+  .fail { background: #4a2020; color: #f08080; }
+  .note {
+    font-size: 12px;
+    color: #9aa4b0;
+    max-width: 700px;
+  }
+</style>
+</head>
+<body>
+  <h1>Galleria sprite e stanze — modulo grafica</h1>
+  <p class="note">
+    Pagina di review autonoma: carica solo <code>js/sprites.js</code> e <code>js/rooms.js</code>, nessun fetch,
+    funziona da <code>file://</code>. Il check di lunghezza righe gira automaticamente al caricamento di
+    <code>sprites.js</code> (vedi console) ed è ripetuto qui sotto con esito visibile.
+  </p>
+
+  <div id="check-result">Verifica in corso…</div>
+
+  <h2>Alieni — sottorazze × stadi × corpi</h2>
+  <div class="grid" id="grid-alieni"></div>
+
+  <h2>Robot — antenna × testa × colore (stadio baby)</h2>
+  <div class="grid" id="grid-robot-parts"></div>
+
+  <h2>Robot — corpi teen (antenna/testa canone)</h2>
+  <div class="grid" id="grid-robot-corpi"></div>
+
+  <h2>Overlay sporco — campione su ogni razza/sottorazza (2 frame moschine)</h2>
+  <div class="grid" id="grid-sporco"></div>
+
+  <h2>Icone cibo 12×12 — i 9 cibi attuali + fallback per categoria</h2>
+  <div class="grid" id="grid-cibi"></div>
+
+  <h2>Prop attività 12×12 — libro / pesi / specchio / corsa</h2>
+  <div class="grid" id="grid-prop"></div>
+
+  <h2>Effetti overlay — schiuma (lavaggio) e briciole (pasto), 2 frame</h2>
+  <div class="grid" id="grid-effetti"></div>
+
+  <h2>Cartoline esiti missione — 17 scene, con pet campione per razza</h2>
+  <div class="grid" id="grid-cartoline"></div>
+
+  <h2>Stanze — lab / ship × cucina / bagno / salone (con e senza poop)</h2>
+  <div class="grid" id="grid-stanze"></div>
+
+  <h2>Mappa della città (tab Missioni) — attivi illuminati con pin, inCorso pulsante</h2>
+  <div class="grid" id="grid-mappa"></div>
+
+  <h2>Arredi nelle stanze — 3 piazzati per stanza (slot pavimento/muro) + il topo allenatore</h2>
+  <div class="grid" id="grid-arredi"></div>
+
+  <script src="js/sprites.js"></script>
+  <script src="js/rooms.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    function makeCanvas(logicalSize, scale) {
+      var c = document.createElement("canvas");
+      c.width = logicalSize * scale;
+      c.height = logicalSize * scale;
+      return c;
+    }
+
+    function makeCell(container, canvas, label) {
+      var cell = document.createElement("div");
+      cell.className = "cell";
+      cell.appendChild(canvas);
+      var lbl = document.createElement("div");
+      lbl.className = "label";
+      lbl.textContent = label;
+      cell.appendChild(lbl);
+      container.appendChild(cell);
+    }
+
+    // ===== Check lunghezza righe: esito visibile in pagina =====
+    var checkEl = document.getElementById("check-result");
+    var errors = [];
+    var originalError = console.error;
+    console.error = function () {
+      errors.push(Array.prototype.join.call(arguments, " "));
+      originalError.apply(console, arguments);
+    };
+    PETQ.sprites._assertSpriteDims();
+    if (PETQ.rooms._assertMappa) PETQ.rooms._assertMappa();
+    console.error = originalError;
+    if (errors.length === 0) {
+      checkEl.textContent = "Check dimensioni: OK — sprite 16x16, icone 12x12, pin mappa dentro il canvas e senza sovrapposizioni.";
+      checkEl.className = "ok";
+    } else {
+      checkEl.textContent = "Check dimensioni: FALLITO (" + errors.length + " errori, vedi console). " + errors.join(" | ");
+      checkEl.className = "fail";
+    }
+
+    // ===== Alieni: sottorazze x stadi x corpi =====
+    var gridAlieni = document.getElementById("grid-alieni");
+    var sottorazze = ["blob", "insettoide", "rettiliano"];
+    var stadi = ["baby", "teen"];
+    var corpi = ["normale", "magro", "ciccione"];
+    sottorazze.forEach(function (sr) {
+      stadi.forEach(function (stadio) {
+        var corpiList = stadio === "teen" ? corpi : ["normale"];
+        corpiList.forEach(function (corpo) {
+          var canvas = makeCanvas(16, 6);
+          PETQ.sprites.draw(canvas, {
+            razza: "alieno", sottorazza: sr,
+            parts: { colore: 0 }, stadio: stadio, corpo: corpo, sporco: false
+          }, { frame: 0 });
+          makeCell(gridAlieni, canvas, sr + " / " + stadio + " / " + corpo);
+        });
+      });
+    });
+    // varianti colore pelle per sottorazza (campione baby)
+    sottorazze.forEach(function (sr) {
+      [0, 1, 2].forEach(function (colore) {
+        var canvas = makeCanvas(16, 6);
+        PETQ.sprites.draw(canvas, {
+          razza: "alieno", sottorazza: sr,
+          parts: { colore: colore }, stadio: "baby", corpo: "normale", sporco: false
+        }, { frame: 0 });
+        makeCell(gridAlieni, canvas, sr + " / baby / colore" + colore);
+      });
+    });
+
+    // ===== Robot: antenna x testa x colore (baby) =====
+    var gridRobotParts = document.getElementById("grid-robot-parts");
+    for (var ant = 0; ant < 3; ant++) {
+      for (var testa = 0; testa < 3; testa++) {
+        for (var col = 0; col < 3; col++) {
+          var canvas = makeCanvas(16, 6);
+          PETQ.sprites.draw(canvas, {
+            razza: "robot",
+            parts: { antenna: ant, testa: testa, colore: col },
+            stadio: "baby", corpo: "normale", sporco: false
+          }, { frame: 0 });
+          makeCell(gridRobotParts, canvas, "antenna" + ant + " / testa" + testa + " / colore" + col);
+        }
+      }
+    }
+
+    // ===== Robot: corpi teen =====
+    var gridRobotCorpi = document.getElementById("grid-robot-corpi");
+    corpi.forEach(function (corpo) {
+      var canvas = makeCanvas(16, 6);
+      PETQ.sprites.draw(canvas, {
+        razza: "robot",
+        parts: { antenna: 0, testa: 0, colore: 0 },
+        stadio: "teen", corpo: corpo, sporco: false
+      }, { frame: 0 });
+      makeCell(gridRobotCorpi, canvas, "robot / teen / " + corpo);
+    });
+
+    // ===== Overlay sporco: campione su un pet per combinazione razza/sottorazza, 2 frame moschine =====
+    var gridSporco = document.getElementById("grid-sporco");
+    var sporcoCampioni = [
+      { razza: "robot", sottorazza: null, parts: { antenna: 0, testa: 0, colore: 0 }, stadio: "teen", corpo: "normale" },
+      { razza: "alieno", sottorazza: "blob", parts: { colore: 0 }, stadio: "teen", corpo: "normale" },
+      { razza: "alieno", sottorazza: "insettoide", parts: { colore: 0 }, stadio: "teen", corpo: "normale" },
+      { razza: "alieno", sottorazza: "rettiliano", parts: { colore: 0 }, stadio: "teen", corpo: "normale" }
+    ];
+    sporcoCampioni.forEach(function (base) {
+      [0, 1].forEach(function (frame) {
+        var canvas = makeCanvas(16, 6);
+        var pet = {
+          razza: base.razza, sottorazza: base.sottorazza, parts: base.parts,
+          stadio: base.stadio, corpo: base.corpo, sporco: true
+        };
+        PETQ.sprites.draw(canvas, pet, { frame: frame });
+        makeCell(gridSporco, canvas, (base.sottorazza || base.razza) + " sporco — frame " + frame);
+      });
+    });
+
+    // ===== Icone cibo: i 9 cibi di content/cibi.md (inline, niente fetch) + fallback per categoria =====
+    var gridCibi = document.getElementById("grid-cibi");
+    var cibiNoti = [
+      { nome: "Crocchette semplici", categoria: "base" },
+      { nome: "Bistecca", categoria: "carne" },
+      { nome: "Spiedino", categoria: "carne" },
+      { nome: "Insalatona", categoria: "verdura" },
+      { nome: "Zuppa di verdure", categoria: "verdura" },
+      { nome: "Sushi", categoria: "pesce" },
+      { nome: "Pesce alla griglia", categoria: "pesce" },
+      { nome: "Biscotto", categoria: "dolce" },
+      { nome: "Torta intera", categoria: "dolce" }
+    ];
+    // cibi ipotetici non mappati: devono cadere sull'icona di categoria
+    var cibiFallback = [
+      { nome: "Arrosto misterioso", categoria: "carne" },
+      { nome: "Bacca ignota", categoria: "verdura" },
+      { nome: "Anguilla", categoria: "pesce" },
+      { nome: "Caramella", categoria: "dolce" },
+      { nome: "Razione X", categoria: "base" }
+    ];
+    cibiNoti.forEach(function (cibo) {
+      var canvas = makeCanvas(12, 8);
+      PETQ.sprites.drawFood(canvas, cibo);
+      makeCell(gridCibi, canvas, cibo.nome);
+    });
+    cibiFallback.forEach(function (cibo) {
+      var canvas = makeCanvas(12, 8);
+      PETQ.sprites.drawFood(canvas, cibo);
+      makeCell(gridCibi, canvas, cibo.nome + " (fallback " + cibo.categoria + ")");
+    });
+
+    // ===== Prop attività =====
+    var gridProp = document.getElementById("grid-prop");
+    [["libro", "Intelligenza"], ["pesi", "Forza"], ["specchio", "Carisma"], ["corsa", "Velocità"]].forEach(function (p) {
+      var canvas = makeCanvas(12, 8);
+      PETQ.sprites.drawProp(canvas, p[0]);
+      makeCell(gridProp, canvas, p[0] + " (" + p[1] + ")");
+    });
+
+    // ===== Effetti overlay: schiuma e briciole sopra un pet campione, 2 frame =====
+    var gridEffetti = document.getElementById("grid-effetti");
+    [0, 1].forEach(function (frame) {
+      var canvas = makeCanvas(16, 6);
+      PETQ.sprites.draw(canvas, { razza: "alieno", sottorazza: "blob", parts: { colore: 0 }, stadio: "teen", corpo: "normale" }, { frame: frame });
+      PETQ.sprites.drawFoam(canvas.getContext("2d"), frame);
+      makeCell(gridEffetti, canvas, "schiuma — frame " + frame);
+    });
+    [0, 1].forEach(function (frame) {
+      var canvas = makeCanvas(16, 6);
+      PETQ.sprites.draw(canvas, { razza: "alieno", sottorazza: "blob", parts: { colore: 0 }, stadio: "teen", corpo: "normale" }, { frame: frame });
+      PETQ.sprites.drawCrumbs(canvas.getContext("2d"), frame);
+      makeCell(gridEffetti, canvas, "briciole — frame " + frame);
+    });
+
+    // ===== Cartoline: tutte le scene, con un pet campione per razza =====
+    var gridCartoline = document.getElementById("grid-cartoline");
+    var petCampioni = [
+      { label: "robot", pet: { razza: "robot", parts: { antenna: 0, testa: 0, colore: 0 }, stadio: "teen", corpo: "normale" } },
+      { label: "alieno", pet: { razza: "alieno", sottorazza: "rettiliano", parts: { colore: 0 }, stadio: "teen", corpo: "normale" } }
+    ];
+    (PETQ.sprites._cartoline || []).forEach(function (scenaId) {
+      petCampioni.forEach(function (c) {
+        var scale = 3;
+        var canvas = document.createElement("canvas");
+        canvas.width = 112 * scale;
+        canvas.height = 64 * scale;
+        PETQ.sprites.drawCartolina(canvas, scenaId, c.pet);
+        var cell = document.createElement("div");
+        cell.className = "cell room-cell";
+        cell.appendChild(canvas);
+        var lbl = document.createElement("div");
+        lbl.className = "label";
+        lbl.textContent = scenaId + " — " + c.label;
+        cell.appendChild(lbl);
+        gridCartoline.appendChild(cell);
+      });
+    });
+
+    // ===== Stanze =====
+    var gridStanze = document.getElementById("grid-stanze");
+    var temi = ["lab", "ship"];
+    var stanzeNomi = ["cucina", "bagno", "salone"];
+    var poopVariants = [0, 2];
+    var roomW = PETQ.rooms._W || 112;
+    var roomH = PETQ.rooms._H || 64;
+    temi.forEach(function (tema) {
+      stanzeNomi.forEach(function (stanza) {
+        poopVariants.forEach(function (poop) {
+          var scale = 4;
+          var canvas = document.createElement("canvas");
+          canvas.width = roomW * scale;
+          canvas.height = roomH * scale;
+          PETQ.rooms.draw(canvas, tema, stanza, { poop: poop, arredi: [] });
+          var cell = document.createElement("div");
+          cell.className = "cell room-cell";
+          cell.appendChild(canvas);
+          var lbl = document.createElement("div");
+          lbl.className = "label";
+          lbl.textContent = tema + " / " + stanza + " / poop=" + poop;
+          cell.appendChild(lbl);
+          gridStanze.appendChild(cell);
+        });
+      });
+    });
+
+    // ===== Mappa della città: tutti attivi / rosa di 4 / inCorso frame 0 e 1 =====
+    var gridMappa = document.getElementById("grid-mappa");
+    var mappaW = PETQ.rooms._MAPPA_W || 112;
+    var mappaH = PETQ.rooms._MAPPA_H || 96;
+    var mappaVarianti = [
+      { label: "tutti attivi", stato: { attivi: ["m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"], inCorso: null, frame: 0 } },
+      { label: "rosa di 4 (m1 m4 m5 m8)", stato: { attivi: ["m1", "m4", "m5", "m8"], inCorso: null, frame: 0 } },
+      { label: "inCorso m3 — frame 0", stato: { attivi: ["m1", "m4", "m5"], inCorso: "m3", frame: 0 } },
+      { label: "inCorso m3 — frame 1", stato: { attivi: ["m1", "m4", "m5"], inCorso: "m3", frame: 1 } }
+    ];
+    mappaVarianti.forEach(function (v) {
+      var scale = 4;
+      var canvas = document.createElement("canvas");
+      canvas.width = mappaW * scale;
+      canvas.height = mappaH * scale;
+      PETQ.rooms.drawMappa(canvas, v.stato);
+      var cell = document.createElement("div");
+      cell.className = "cell room-cell";
+      cell.appendChild(canvas);
+      var lbl = document.createElement("div");
+      lbl.className = "label";
+      lbl.textContent = v.label;
+      cell.appendChild(lbl);
+      gridMappa.appendChild(cell);
+    });
+
+    // ===== Arredi nelle stanze: una stanza per tema con 3 arredi campione + il topo =====
+    var gridArredi = document.getElementById("grid-arredi");
+    var arrediDemo = [
+      { tema: "lab", stanza: "salone", arredi: ["Coppa Arcade", "Lampada da terra", "Topo allenatore"] },
+      { tema: "ship", stanza: "salone", arredi: ["Acquario di meduse", "Pattini da gara", "Piantina strana"] },
+      { tema: "lab", stanza: "cucina", arredi: ["Tappeto morbido", "Frigo nuovo", "Arredo Sconosciuto (fallback)"] },
+      { tema: "ship", stanza: "bagno", arredi: ["Vasca idromassaggio", "Pesi", "Poster motivazionale"] }
+    ];
+    arrediDemo.forEach(function (d) {
+      var scale = 4;
+      var canvas = document.createElement("canvas");
+      canvas.width = roomW * scale;
+      canvas.height = roomH * scale;
+      PETQ.rooms.draw(canvas, d.tema, d.stanza, { poop: 0, arredi: d.arredi });
+      var cell = document.createElement("div");
+      cell.className = "cell room-cell";
+      cell.appendChild(canvas);
+      var lbl = document.createElement("div");
+      lbl.className = "label";
+      lbl.textContent = d.tema + " / " + d.stanza + " — " + d.arredi.join(", ");
+      cell.appendChild(lbl);
+      gridArredi.appendChild(cell);
+    });
+  })();
+  </script>
+</body>
+</html>
