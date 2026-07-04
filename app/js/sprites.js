@@ -444,6 +444,44 @@ window.PETQ = window.PETQ || {};
     });
   }
 
+  // Palpebre chiuse (overlay sonno, GDD "Energia e sonno"): due trattini scuri sovrapposti
+  // alla fascia occhi del pet, indipendenti da razza/sottorazza (riga occhi non nota qui a
+  // priori: l'overlay copre approssimativamente il terzo superiore del corpo, dove in tutti
+  // gli sprite 16x16 di questo modulo si trovano gli occhi/il viso).
+  var ZZZ_COLOR = "#dfe4ec";
+  function drawPalpebre(ctx) {
+    if (!ctx) return;
+    var s = ctx.canvas.width / SIZE;
+    ctx.fillStyle = "rgba(20,20,24,0.75)";
+    ctx.fillRect(3 * s, 6 * s, 4 * s, 1 * s);
+    ctx.fillRect(9 * s, 6 * s, 4 * s, 1 * s);
+  }
+
+  // 2-3 "Z" pixel animabili sopra la testa del pet, 2 frame (alternano posizione/dimensione)
+  function drawZzz(ctx, frame) {
+    if (!ctx) return;
+    var s = ctx.canvas.width / SIZE;
+    var f = frame === 1 ? 1 : 0;
+    ctx.fillStyle = ZZZ_COLOR;
+    var zetas = f === 1
+      ? [[11, -1, 3], [13, -3, 2], [14, -5, 1]]
+      : [[10, 0, 3], [12, -2, 2], [13, -4, 1]];
+    zetas.forEach(function (z) {
+      var x = z[0], y = z[1], size = z[2];
+      // "Z" minimale: barra sopra, diagonale, barra sotto (scala size in pixel logici)
+      ctx.fillRect(x * s, y * s, size * s, s);
+      ctx.fillRect((x + size - 1) * s, (y + 1) * s, s, s);
+      if (size > 2) ctx.fillRect((x + size - 2) * s, (y + 1) * s, s, s);
+      ctx.fillRect(x * s, (y + size - 1) * s, size * s, s);
+    });
+  }
+
+  // overlay completo "dorme" sul canvas del pet: palpebre chiuse + Zzz
+  function drawSonno(ctx, frame) {
+    drawPalpebre(ctx);
+    drawZzz(ctx, frame);
+  }
+
   // ===== Cartoline esiti missione: canvas logico 112x64, rect-composition + sprite del pet =====
   var CART_W = 112, CART_H = 64;
 
@@ -846,6 +884,8 @@ window.PETQ = window.PETQ || {};
     drawProp: drawProp,
     drawFoam: drawFoam,
     drawCrumbs: drawCrumbs,
+    drawZzz: drawZzz,
+    drawSonno: drawSonno,
     drawCartolina: drawCartolina,
     _cartoline: Object.keys(SCENE),
     // topo amichevole riusabile fuori dalle cartoline (arredo "allenatore" nelle stanze)

@@ -18,19 +18,36 @@ window.PETQ = window.PETQ || {};
     { match: 'ritorno: successo', chiave: 'missione_successo' },
     { match: 'ritorno: fallimento', chiave: 'missione_fallimento' },
     { match: 'notifica', chiave: 'notifica' },
-    { match: 'parola imparata', chiave: 'parola' }
+    { match: 'parola imparata', chiave: 'parola' },
+    { match: 'ha sonno', chiave: 'sonno' },
+    { match: 'va a dormire', chiave: 'dormire' },
+    { match: 'sveglia', chiave: 'sveglia' },
+    { match: 'dormito male', chiave: 'dormito_male' }
   ];
 
   var SEZIONE_CHIAVI = ['saluto', 'fame', 'sporco', 'felice', 'triste',
     'missione_partenza', 'missione_successo', 'missione_fallimento', 'notifica', 'parola',
-    'valigia', 'notifica_valigia', 'rientro', 'addio'];
+    'valigia', 'notifica_valigia', 'rientro', 'addio',
+    'sonno', 'dormire', 'sveglia', 'dormito_male'];
 
   var DEFAULT_BILANCIAMENTO = {
     decadimento: { fame: 6, igiene: 3, felicita: 2 },
     soglie: { critica: 25, magro: 30, sporco: 30, malusSalute: 40 },
     economia: { login: 10, monetePartenza: 50 },
     allenamento: { sessioni: 1, effetto: 1, felicita: 5 },
-    iniziali: { benessere: 70, base: 0, firma: 1 }
+    iniziali: { benessere: 70, base: 0, firma: 1 },
+    energia_sonno: {
+      decadimento: 4,
+      costoMissionePerOra: 8,
+      costoAllenamento: 10,
+      sogliaRifiuto: 20,
+      oraLetto: 21,
+      oraCrollo: 23,
+      sveglioAutonomoOre: 8,
+      sonnoMinimoOre: 6,
+      risveglioBuono: 100,
+      risveglioCattivo: 70
+    }
   };
 
   function vuotaPersonalita() {
@@ -865,7 +882,17 @@ window.PETQ = window.PETQ || {};
       ['malus missione da salute', ['soglie', 'malusSalute'], 0],
       ['login giornaliero', ['economia', 'login'], 0],
       ['monete iniziali', ['economia', 'monetePartenza'], 0],
-      ['sessioni al giorno', ['allenamento', 'sessioni'], 0]
+      ['sessioni al giorno', ['allenamento', 'sessioni'], 0],
+      ['decadimento energia', ['energia_sonno', 'decadimento'], -1],
+      ['costo missione', ['energia_sonno', 'costoMissionePerOra'], 0],
+      ['costo allenamento', ['energia_sonno', 'costoAllenamento'], -1],
+      ['soglia rifiuto', ['energia_sonno', 'sogliaRifiuto'], -1],
+      ['ora del letto', ['energia_sonno', 'oraLetto'], -1],
+      ['ora del crollo automatico', ['energia_sonno', 'oraCrollo'], -1],
+      ['sveglia autonoma dopo', ['energia_sonno', 'sveglioAutonomoOre'], 0],
+      ['sonno minimo per sveglia', ['energia_sonno', 'sonnoMinimoOre'], -1],
+      ['energia al risveglio (dormito bene', ['energia_sonno', 'risveglioBuono'], -1],
+      ['energia al risveglio (crollato', ['energia_sonno', 'risveglioCattivo'], -1]
     ];
 
     for (var i = 0; i < mappa.length; i++) {

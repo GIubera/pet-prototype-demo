@@ -97,6 +97,9 @@ window.PETQ = window.PETQ || {};
 
   function train(state, statNome) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
+    if (state.sonno) {
+      return { ok: false, msg: (state.pet.nome || 'Il pet') + ' sta dormendo.' };
+    }
     var oggi = oggiStr();
     if (state.trainDay === oggi) {
       return { ok: false, msg: 'Allenamento già fatto oggi.' };
@@ -104,10 +107,14 @@ window.PETQ = window.PETQ || {};
     if (!state.pet.rpg || typeof state.pet.rpg[statNome] !== 'number') {
       return { ok: false, msg: 'Statistica non valida.' };
     }
+    if (PETQ.pet.energiaSottoSoglia(state.pet)) {
+      return { ok: false, msg: 'Troppo stanco per allenarsi.', battutaPool: 'sonno' };
+    }
 
     var bil = bilanciamento();
     var effetto = (bil.allenamento && typeof bil.allenamento.effetto === 'number') ? bil.allenamento.effetto : 1;
     var felicitaBonus = (bil.allenamento && typeof bil.allenamento.felicita === 'number') ? bil.allenamento.felicita : 5;
+    var es = PETQ.pet.bilEnergiaSonno();
 
     if (PETQ.arredi && PETQ.arredi.bonusAllenamento) {
       effetto += PETQ.arredi.bonusAllenamento(state, statNome);
@@ -115,6 +122,7 @@ window.PETQ = window.PETQ || {};
 
     state.pet.rpg[statNome] += effetto;
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + felicitaBonus, 0, 100);
+    state.pet.stats.energia = clamp(state.pet.stats.energia - es.costoAllenamento, 0, 100);
     state.trainDay = oggi;
     PETQ.pet.recomputeSalute(state.pet, state);
 

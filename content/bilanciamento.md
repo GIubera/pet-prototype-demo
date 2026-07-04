@@ -123,6 +123,25 @@ Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da r
 | RPG | 0 punti base + casuale 0-3 per stat, poi +1 alla stat "firma" della personalità |
 | Stat firma | gentile→Carisma, maleducato→Intelligenza, nerd→Intelligenza, sportivo→Forza — nerd e maleducato differenziati via item del tutorial (GameBit vs Fumetto sarcastico) |
 
+## Energia e sonno
+
+Quinta stat di benessere (v. GDD "Energia e sonno", decisione fondatore 4 lug 2026). Numeri v1 di Claude, da tarare.
+
+| Cosa | Valore |
+|---|---|
+| Decadimento Energia (per ora di gioco attivo) | −4 |
+| Costo missione | −8 per ora di durata |
+| Costo allenamento | −10 |
+| Soglia rifiuto (missioni e allenamento) | < 20 |
+| Ora del letto (da qui si può andare a dormire) | 21 |
+| Ora del crollo automatico (se sveglio e non a letto) | 23 |
+| Sveglia autonoma dopo | 8 ore di sonno |
+| Sonno minimo per sveglia "buona" | 6 ore |
+| Energia al risveglio (dormito bene, a letto ≥6h) | 100 |
+| Energia al risveglio (crollato/dormito male) | 70 |
+
+Note di design: sotto la soglia rifiuto, oltre a bloccare missioni/allenamento, la Felicità cala più in fretta (stessa regola delle altre stat critiche). Se il giocatore sveglia il pet prima delle 6 ore, l'Energia torna proporzionale alle ore dormite (min 30) invece del valore pieno: è una scelta del giocatore, non una punizione fissa.
+
 ## Scene missione (decisione fondatore)
 
 Cartoline pixel art (stile rect-composition + sprite, come le stanze): **generiche** per standard e fallimento (una per categoria/tono), **dedicate** per ogni super successo (~10). Nell'app si arricchiscono fino alla copertura completa. Le righe "Scena" nelle schede sono il brief.

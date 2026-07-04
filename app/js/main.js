@@ -14,11 +14,24 @@ window.PETQ = window.PETQ || {};
       migraState(state);
       applicaDecadimentoOffline(state);
       eseguiLoginGiornaliero(state);
+      controllaCicloSonno(state);
       PETQ.save.save(state);
 
       avviaTicking(state);
       renderIniziale(state);
     });
+  }
+
+  // Controlla al boot/tick il ciclo sonno (GDD "Energia e sonno"): sveglia autonoma se sono
+  // passate >=8h dall'inizio del sonno, altrimenti crollo automatico se sono le 23 e il pet e'
+  // ancora sveglio. Le due funzioni sono mutuamente esclusive (una richiede state.sonno, l'altra
+  // richiede !state.sonno) percio' l'ordine non conta ai fini della correttezza.
+  function controllaCicloSonno(state) {
+    if (!state || !PETQ.pet) return null;
+    var risveglio = PETQ.pet.controllaSveglia(state);
+    if (risveglio) return risveglio;
+    PETQ.pet.controllaCrolloAutomatico(state);
+    return null;
   }
 
   // Sotto questa eta' (ms dalla creazione del pet) una partita si considera "appena iniziata
@@ -62,6 +75,14 @@ window.PETQ = window.PETQ || {};
       state.tutorialFatto = !eAppenaIniziata;
     }
 
+    // Migrazione modulo Energia e sonno (v. save.js migraState, stessa regola duplicata qui
+    // perche' main.js ha la sua migrazione indipendente eseguita al boot): energia parte a 70
+    // come le altre stat di benessere per i salvataggi che non la conoscevano ancora.
+    if (state.pet && state.pet.stats && typeof state.pet.stats.energia !== 'number') {
+      state.pet.stats.energia = 70;
+    }
+    if (typeof state.sonno === 'undefined') state.sonno = null;
+
     if (PETQ.pet && state.pet) {
       PETQ.pet.recomputeSalute(state.pet, state);
     }
@@ -98,6 +119,7 @@ window.PETQ = window.PETQ || {};
       if (state.pet && PETQ.pet && PETQ.pet.applyDecay) {
         PETQ.pet.applyDecay(state.pet, deltaOreGioco, state);
       }
+      controllaCicloSonno(state);
       state.lastSeen = Date.now();
       PETQ.save.save(state);
 
@@ -115,7 +137,7 @@ window.PETQ = window.PETQ || {};
     }
   }
 
-  PETQ.main = { avviaTicking: avviaTicking, migraState: migraState };
+  PETQ.main = { avviaTicking: avviaTicking, migraState: migraState, controllaCicloSonno: controllaCicloSonno };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

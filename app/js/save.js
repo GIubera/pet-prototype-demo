@@ -34,6 +34,14 @@ window.PETQ = window.PETQ || {};
     if (!Array.isArray(state.categoriePastiOggi)) state.categoriePastiOggi = [];
     state.tutorialFatto = !!state.tutorialFatto;
     if (typeof state.missione === 'undefined') state.missione = null;
+
+    // Migrazione modulo Energia e sonno: salvataggi pre-esistenti non hanno pet.stats.energia
+    // ne' state.sonno. Default da bilanciamento.md ("Stat iniziali alla generazione"): energia
+    // parte a 70 come le altre stat di benessere (richiesta esplicita del fondatore).
+    if (state.pet && state.pet.stats && typeof state.pet.stats.energia !== 'number') {
+      state.pet.stats.energia = 70;
+    }
+    if (typeof state.sonno === 'undefined') state.sonno = null;
   }
 
   function save(state) {

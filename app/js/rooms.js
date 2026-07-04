@@ -222,6 +222,57 @@ window.PETQ = window.PETQ || {};
     O(g, 18, 48, 50, 12, L.tappetoBordo, L.tappeto);
     R(g, 20, 51, 46, 1, L.tappetoRiga);
     R(g, 20, 56, 46, 1, L.tappetoRiga);
+    labLetto(g);
+    mensolaSalone(g, "lab");
+  }
+
+  // Mensola a muro del salone + zona ganci/quadri accanto (supporti collezione, GDD -> Casa).
+  // Ripiano oggetti a y14-16 (lo slot "mensola" appoggia qui), ripiano decorativo sotto a y19-21.
+  function mensolaSalone(g, tema) {
+    if (tema === "lab") {
+      // mensola metallica con montanti e staffe
+      R(g, 25, 14, 16, 2, L.metalloChiaro);
+      R(g, 25, 16, 16, 1, L.out);
+      R(g, 25, 19, 16, 2, L.metalloChiaro);
+      R(g, 25, 21, 16, 1, L.out);
+      R(g, 25, 14, 1, 8, L.metalloScuro); // montanti
+      R(g, 40, 14, 1, 8, L.metalloScuro);
+      // mini-libri decorativi sul ripiano basso
+      R(g, 28, 16, 2, 3, "#c22a3a");
+      R(g, 31, 16, 2, 3, "#4a7ba6");
+      R(g, 35, 17, 3, 2, "#f0b84a");
+      // ganci a muro accanto (zona quadri)
+      R(g, 44, 6, 2, 2, L.metalloScuro);
+      R(g, 49, 6, 2, 2, L.metalloScuro);
+    } else {
+      // mensola fluttuante luminosa (niente montanti, glow sotto i ripiani)
+      R(g, 25, 14, 16, 2, S.metalloChiaro);
+      R(g, 25, 16, 16, 1, S.glow);
+      R(g, 25, 19, 16, 2, S.metalloChiaro);
+      R(g, 25, 21, 16, 1, S.glow);
+      R(g, 28, 16, 2, 3, "#4ae0d8"); // mini-oggetti luminosi
+      R(g, 31, 16, 2, 3, "#e85ad8");
+      R(g, 35, 17, 3, 2, "#f0b84a");
+      R(g, 44, 6, 2, 2, S.metalloChiaro); // ganci
+      R(g, 49, 6, 2, 2, S.metalloChiaro);
+    }
+  }
+
+  // Letto (GDD "Energia e sonno"): brandina metallica con cuscino, incastrata tra lo slot
+  // arredo di sinistra (SLOT_SPOTS.salone[0], x:2-16) e il pet al centro (x:40+). Coordinate
+  // esposte in PETQ.rooms._letto.salone per l'hotzone drag della UI.
+  function labLetto(g) {
+    var r = LETTO_SALONE;
+    // gambe metalliche
+    R(g, r.x + 1, r.y + r.h - 3, 2, 3, L.metalloScuro);
+    R(g, r.x + r.w - 3, r.y + r.h - 3, 2, 3, L.metalloScuro);
+    // telaio brandina
+    O(g, r.x, r.y + 6, r.w, r.h - 9, L.out, L.metallo);
+    R(g, r.x + 2, r.y + 8, r.w - 4, r.h - 13, L.metalloChiaro);
+    // cuscino
+    O(g, r.x + 2, r.y + 2, 9, 7, L.out, L.crema);
+    // testiera
+    R(g, r.x, r.y + 3, 2, r.h - 6, L.metalloScuro);
   }
 
   // ===== SHIP (stessi slot, skin sci-fi; oblò con stelle e palette parete diversa in ogni stanza) =====
@@ -329,6 +380,22 @@ window.PETQ = window.PETQ || {};
     O(g, 18, 48, 50, 12, S.out, S.pad);
     R(g, 20, 49, 46, 1, S.glow);
     R(g, 20, 58, 46, 1, S.glow);
+    shipLetto(g);
+    mensolaSalone(g, "ship");
+  }
+
+  // Letto ship (GDD "Energia e sonno"): capsula/amaca sospesa tra due montanti, stessa
+  // posizione/hotzone del lab (v. LETTO_SALONE) per coerenza di layout tra le due razze.
+  function shipLetto(g) {
+    var r = LETTO_SALONE;
+    // montanti
+    R(g, r.x, r.y, 2, r.h, S.metalloChiaro);
+    R(g, r.x + r.w - 2, r.y, 2, r.h, S.metalloChiaro);
+    // capsula sospesa (sacco energetico) con glow
+    O(g, r.x + 1, r.y + 5, r.w - 2, r.h - 8, S.out, S.mobiletto);
+    R(g, r.x + 3, r.y + 7, r.w - 6, r.h - 12, S.sportello);
+    R(g, r.x + 4, r.y + 8, 3, 2, S.ledC);
+    R(g, r.x + r.w - 7, r.y + r.h - 6, 3, 2, S.ledM);
   }
 
   var BUILDERS = {
@@ -729,12 +796,45 @@ window.PETQ = window.PETQ || {};
   assertMappa();
 
   // ===== Arredi piazzati nelle stanze (112x64): 3 slot per stanza, footprint max ~14x14 =====
-  // slot scelti per non coprire i mobili chiave né il pet al centro
+  // Salone: supporti dedicati (GDD -> Casa) — mensola a muro (oggetti appoggiati, piano a y=14),
+  // zona ganci/quadri accanto, pavimento a sinistra del letto. Cucina/bagno come prima.
   var SLOT_SPOTS = {
     cucina: [[24, 48], [70, 48], [96, 47]],
     bagno:  [[24, 48], [66, 46], [32, 8]],
-    salone: [[2, 46],  [72, 46], [78, 30]]
+    salone: [[26, 0], [40, 4], [2, 46]]
   };
+  // tipo di supporto di ogni slot, nello stesso ordine di SLOT_SPOTS
+  var SLOT_TIPI = {
+    cucina: ["pavimento", "pavimento", "pavimento"],
+    bagno:  ["pavimento", "pavimento", "pavimento"],
+    salone: ["mensola", "muro", "pavimento"]
+  };
+
+  // supporto naturale di ogni arredo (chiavi normalizzate); tutto il resto -> pavimento
+  var ARREDO_SUPPORTO = {
+    postermotivazionale: "muro", fasciadamartialartist: "muro", completodamartialartist: "muro",
+    bastonedacombattimento: "muro", saigemelli: "muro", nunchakuarrugginiti: "muro",
+    kataneafarfalla: "muro", megafono: "muro", ombrellomeccanico: "muro",
+    pattinospaiato: "muro", pattinidagara: "muro",
+    coppaarcade: "mensola", statuettatipooscar: "mensola", macchininagiocattolo: "mensola",
+    gamebitportatile: "mensola", fumettosarcastico: "mensola", albumdadisegno: "mensola",
+    libro: "mensola", microfonogiocattolo: "mensola",
+    tappetomorbido: "pavimento", pesi: "pavimento", scootergiocattolo: "pavimento",
+    pallonedacalcio: "pavimento", lampadadaterra: "pavimento", piantinastrana: "pavimento",
+    vascaidromassaggio: "pavimento", acquariodimeduse: "pavimento",
+    servostazionediricarica: "pavimento", frigonuovo: "pavimento"
+  };
+  function supportoDi(nome) {
+    var k = normalizzaArredo(nome);
+    if (ARREDO_SUPPORTO[k]) return ARREDO_SUPPORTO[k];
+    return "pavimento"; // topo, fallback e sconosciuti stanno a terra
+  }
+
+  // Letto del salone (GDD "Energia e sonno"): incastrato tra lo slot arredo di sinistra
+  // (SLOT_SPOTS.salone[0] finisce a x=16) e il pet al centro stanza (x:40-72 circa), sotto
+  // il divano/seduta (che finiscono a y:40-42). Stesso rettangolo per lab e ship: e' anche
+  // l'hotzone drag esposta alla UI (pattern HOTZONE_VASCA).
+  var LETTO_SALONE = { x: 17, y: 44, w: 22, h: 18 };
 
   var A_OUT = "#241c14";
 
@@ -751,17 +851,20 @@ window.PETQ = window.PETQ || {};
   }
 
   var ARREDI = {
-    pallonedacalcio: function (g, x, y) {
-      O(g, x + 2, y + 4, 10, 10, A_OUT, "#f4f4f0");
-      R(g, x + 6, y + 7, 3, 3, "#1e2830");
-      R(g, x + 3, y + 6, 2, 2, "#1e2830");
-      R(g, x + 9, y + 11, 2, 2, "#1e2830");
+    pallonedacalcio: function (g, x, y) { // bianco/nero a esagoni accennati
+      O(g, x + 2, y + 3, 10, 11, "#0e1118", "#ffffff");
+      R(g, x + 6, y + 7, 3, 3, "#16120e"); // pentagono centrale
+      R(g, x + 3, y + 5, 2, 2, "#16120e"); // spicchi ai bordi
+      R(g, x + 9, y + 5, 2, 2, "#16120e");
+      R(g, x + 4, y + 11, 2, 2, "#16120e");
+      R(g, x + 8, y + 11, 2, 2, "#16120e");
     },
-    gamebitportatile: function (g, x, y) {
-      O(g, x + 2, y + 5, 10, 8, A_OUT, "#8fa3ad");
-      R(g, x + 4, y + 7, 4, 4, "#5ce87f");
-      R(g, x + 9, y + 7, 2, 2, "#c22a3a");
-      R(g, x + 9, y + 10, 2, 1, "#1e2830");
+    gamebitportatile: function (g, x, y) { // schermo acceso
+      O(g, x + 2, y + 6, 10, 8, "#0e1118", "#5c6b74");
+      R(g, x + 4, y + 8, 4, 4, "#5ce87f");
+      R(g, x + 4, y + 8, 4, 1, "#b8ffd0"); // scanline
+      R(g, x + 9, y + 8, 2, 2, "#e85a5a");
+      R(g, x + 9, y + 11, 2, 1, "#f0b84a");
     },
     microfonogiocattolo: function (g, x, y) {
       R(g, x + 6, y + 5, 2, 7, "#5c6b74");
@@ -775,13 +878,14 @@ window.PETQ = window.PETQ || {};
       R(g, x + 6, y + 7, 2, 4, "#1e2830");
       R(g, x + 6, y + 12, 2, 1, "#1e2830");
     },
-    coppaarcade: function (g, x, y) {
-      O(g, x + 3, y + 2, 8, 5, "#6e4826", "#f0b84a");
-      R(g, x + 1, y + 3, 2, 2, "#f0b84a");
-      R(g, x + 11, y + 3, 2, 2, "#f0b84a");
-      R(g, x + 6, y + 7, 2, 3, "#c99a3c");
-      R(g, x + 4, y + 10, 6, 2, "#6e4826");
-      R(g, x + 4, y + 3, 1, 2, "#f8e05a");
+    coppaarcade: function (g, x, y) { // dorata brillante, base a filo mensola
+      O(g, x + 2, y + 1, 10, 6, "#3a2808", "#f8c832");
+      R(g, x, y + 2, 2, 3, "#f8c832"); // manici
+      R(g, x + 12, y + 2, 2, 3, "#f8c832");
+      R(g, x + 6, y + 7, 2, 4, "#c99a3c"); // stelo
+      R(g, x + 3, y + 11, 8, 3, "#3a2808"); // base
+      R(g, x + 4, y + 11, 6, 1, "#c99a3c");
+      R(g, x + 3, y + 2, 2, 3, "#fff0a0"); // riflesso
     },
     macchininagiocattolo: function (g, x, y) {
       R(g, x + 1, y + 6, 12, 5, A_OUT);
@@ -813,10 +917,11 @@ window.PETQ = window.PETQ || {};
       R(g, x + 10, y + 2, 2, 5, "#f0b84a"); // matita appoggiata
       R(g, x + 10, y + 1, 2, 1, "#37424c");
     },
-    libro: function (g, x, y) {
-      O(g, x + 4, y + 3, 7, 11, A_OUT, "#4a7ba6");
-      R(g, x + 5, y + 4, 1, 9, "#f4f0e0");
-      R(g, x + 7, y + 6, 3, 2, "#f0b84a");
+    libro: function (g, x, y) { // dorso colorato ben visibile
+      O(g, x + 4, y + 3, 7, 11, "#0e1118", "#4a7ba6");
+      R(g, x + 5, y + 4, 2, 9, "#e85a5a"); // dorso rosso
+      R(g, x + 9, y + 4, 1, 9, "#f4f0e0"); // taglio pagine
+      R(g, x + 7, y + 6, 1, 3, "#f0b84a"); // fregio
     },
     ombrellomeccanico: function (g, x, y) { // chiuso, appoggiato
       R(g, x + 6, y + 1, 3, 3, "#8fa3ad");
@@ -832,18 +937,20 @@ window.PETQ = window.PETQ || {};
       R(g, x + 2, y + 12, 3, 2, "#1e2830");
       R(g, x + 9, y + 12, 3, 2, "#1e2830");
     },
-    megafono: function (g, x, y) {
-      R(g, x + 2, y + 7, 4, 4, "#c23a3a");
-      R(g, x + 6, y + 5, 5, 8, "#e85a5a");
-      R(g, x + 11, y + 4, 1, 10, "#f4f0e0");
-      R(g, x + 3, y + 11, 2, 3, "#37424c");
+    megafono: function (g, x, y) { // rosso acceso, bocca bianca, outline scuro
+      R(g, x + 1, y + 5, 5, 7, "#3a0e0e");
+      R(g, x + 2, y + 6, 3, 5, "#c22a3a");
+      R(g, x + 5, y + 3, 6, 11, "#3a0e0e");
+      R(g, x + 6, y + 4, 4, 9, "#e84040");
+      R(g, x + 11, y + 2, 2, 12, "#f4f0e0"); // bocca bianca
+      R(g, x + 2, y + 12, 2, 2, "#37424c"); // manico
     },
-    statuettatipooscar: function (g, x, y) {
-      R(g, x + 6, y + 2, 2, 2, "#f0b84a");
-      R(g, x + 5, y + 4, 4, 5, "#f0b84a");
+    statuettatipooscar: function (g, x, y) { // oro brillante su base nera
+      R(g, x + 6, y + 1, 2, 2, "#f8c832");
+      R(g, x + 5, y + 3, 4, 6, "#f8c832");
+      R(g, x + 6, y + 3, 1, 4, "#fff0a0");
       R(g, x + 6, y + 9, 2, 2, "#c99a3c");
-      R(g, x + 4, y + 11, 6, 3, "#6e4826");
-      R(g, x + 6, y + 4, 1, 3, "#f8e05a");
+      R(g, x + 3, y + 11, 8, 3, "#16120e"); // base nera
     },
     bastonedacombattimento: function (g, x, y) {
       rastrelliera(g, x, y);
@@ -871,10 +978,11 @@ window.PETQ = window.PETQ || {};
       R(g, x + 8, y + 2, 1, 9, "#dfe4ec");
       R(g, x + 8, y + 11, 1, 2, "#5c3a1e");
     },
-    pesi: function (g, x, y) {
-      R(g, x + 2, y + 8, 3, 6, "#37424c");
-      R(g, x + 9, y + 8, 3, 6, "#37424c");
-      R(g, x + 5, y + 10, 4, 2, "#8fa3ad");
+    pesi: function (g, x, y) { // outline netto + barra chiara: leggibile anche sul pad scuro ship
+      O(g, x + 1, y + 7, 4, 7, "#0e1118", "#37424c");
+      O(g, x + 9, y + 7, 4, 7, "#0e1118", "#37424c");
+      R(g, x + 5, y + 9, 4, 2, "#c9d2dc");
+      R(g, x + 2, y + 8, 1, 3, "#8fa3ad"); // riflesso piastra
     },
     pattinospaiato: function (g, x, y) {
       R(g, x + 4, y + 5, 6, 5, "#e85a3c");
@@ -997,6 +1105,34 @@ window.PETQ = window.PETQ || {};
     return nomi;
   }
 
+  // assert di sviluppo: slot dentro il canvas stanza, senza sovrapposizioni tra loro né col letto
+  function assertSlots() {
+    function overlap(a, b) {
+      return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    }
+    for (var stanza in SLOT_SPOTS) {
+      if (!Object.prototype.hasOwnProperty.call(SLOT_SPOTS, stanza)) continue;
+      var boxes = SLOT_SPOTS[stanza].map(function (s) { return { x: s[0], y: s[1], w: 14, h: 14 }; });
+      for (var i = 0; i < boxes.length; i++) {
+        if (boxes[i].x < 0 || boxes[i].y < 0 || boxes[i].x + boxes[i].w > W || boxes[i].y + boxes[i].h > H) {
+          console.error("PETQ.rooms: slot " + stanza + "[" + i + "] esce dal canvas " + W + "x" + H);
+        }
+        for (var j = i + 1; j < boxes.length; j++) {
+          if (overlap(boxes[i], boxes[j])) {
+            console.error("PETQ.rooms: slot sovrapposti " + stanza + "[" + i + "]/[" + j + "]");
+          }
+        }
+        if (stanza === "salone" && overlap(boxes[i], LETTO_SALONE)) {
+          console.error("PETQ.rooms: slot salone[" + i + "] si sovrappone al letto");
+        }
+      }
+      if ((SLOT_TIPI[stanza] || []).length !== SLOT_SPOTS[stanza].length) {
+        console.error("PETQ.rooms: _slotTipi." + stanza + " non allineato agli slot");
+      }
+    }
+  }
+  assertSlots();
+
   // ===== Draw pubblico =====
   // tema 'lab'|'ship'; stanza 'cucina'|'bagno'|'salone'; stato {poop:int, arredi:[nomi|{nome}]}
   function draw(canvas, tema, stanza, stato) {
@@ -1013,11 +1149,18 @@ window.PETQ = window.PETQ || {};
       var temaSet = BUILDERS[tema] || BUILDERS.lab;
       var builder = temaSet[stanza] || temaSet.cucina;
       builder(g);
-      // arredi piazzati della stanza corrente, uno per slot
+      // arredi piazzati della stanza corrente: ognuno sul SUO supporto (mensola/muro/pavimento);
+      // se lo slot naturale è occupato o assente, primo slot libero (meglio fuori posto che invisibile)
       var spots = SLOT_SPOTS[stanza] || SLOT_SPOTS.cucina;
+      var tipi = SLOT_TIPI[stanza] || SLOT_TIPI.cucina;
       var nomi = nomiArrediDaStato(stato && stato.arredi);
-      for (var i = 0; i < nomi.length && i < spots.length; i++) {
-        drawArredo(g, nomi[i], spots[i][0], spots[i][1]);
+      var occupato = [false, false, false];
+      for (var i = 0; i < nomi.length; i++) {
+        var idx = tipi.indexOf(supportoDi(nomi[i]));
+        if (idx < 0 || occupato[idx]) idx = occupato.indexOf(false);
+        if (idx < 0) break;
+        occupato[idx] = true;
+        drawArredo(g, nomi[i], spots[idx][0], spots[idx][1]);
       }
       if (stato && stato.poop) drawPoop(g, stato.poop);
     };
@@ -1043,6 +1186,10 @@ window.PETQ = window.PETQ || {};
     _mappaPins: MAPPA_PINS,
     _assertMappa: assertMappa,
     _slotSpots: SLOT_SPOTS,
+    _slotTipi: SLOT_TIPI,
+    _arredoSupporto: ARREDO_SUPPORTO,
+    _assertSlots: assertSlots,
+    _letto: { salone: LETTO_SALONE },
     _arredi: Object.keys(ARREDI),
     _temi: Object.keys(BUILDERS),
     _stanze: ["cucina", "bagno", "salone"]

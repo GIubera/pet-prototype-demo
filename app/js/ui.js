@@ -15,6 +15,19 @@ window.PETQ = window.PETQ || {};
   // posizione del pet durante il lavaggio (dentro la vasca)
   var WASH_POS = { x: 8, y: 14 };
 
+  // hotzone letto (coordinate logiche stanza, salone): stesso rettangolo esposto da
+  // PETQ.rooms._letto.salone, riletto qui con fallback nel caso il modulo grafica non sia
+  // ancora caricato (stesso pattern difensivo di ROOM_W/ROOM_H sopra).
+  function hotzoneLetto() {
+    return (PETQ.rooms && PETQ.rooms._letto && PETQ.rooms._letto.salone) || { x: 17, y: 44, w: 22, h: 18 };
+  }
+  // posizione del pet mentre dorme A LETTO (dentro il rettangolo letto)
+  var SLEEP_BED_POS = { x: 12, y: 32 };
+  // posizione del pet mentre dorme CROLLATO (sul pavimento, al centro come l'idle normale)
+  function sleepFloorPos() {
+    return { x: Math.round((ROOM_W - PET_PX) / 2), y: ROOM_H - PET_PX - 4 };
+  }
+
   // mappa allenamento: prop -> stat (da GDD "Direzione interazione")
   var PROPS_ALLENAMENTO = [
     { id: 'pesi', stat: 'forza', label: 'Forza' },
@@ -120,6 +133,7 @@ window.PETQ = window.PETQ || {};
   function boot(state) {
     if (state) {
       currentState = state;
+      controllaSonnoScaduto();
       // apertura app con missione già finita: risolvi e mostra subito l'esito
       if (controllaMissioneScaduta()) return;
       mostraCasa(state);
@@ -132,6 +146,7 @@ window.PETQ = window.PETQ || {};
     if (!state) return;
     currentState = state;
     controllaAnimScaduta();
+    controllaSonnoScaduto();
     if (!animazioneInCorso && controllaMissioneScaduta()) return;
     if (document.getElementById('petq-casa')) {
       aggiornaHud(state);
@@ -153,6 +168,29 @@ window.PETQ = window.PETQ || {};
     PETQ.save.save(currentState);
     mostraEsito(esito);
     return esito;
+  }
+
+  // Controlla il ciclo sonno (GDD "Energia e sonno"): sveglia autonoma dopo 8h, o crollo
+  // automatico alle 23 se il pet e' ancora sveglio. Chiamata da boot/render/idle (stesso
+  // pattern di controllaMissioneScaduta): idempotente, non fa nulla se non e' il momento.
+  function controllaSonnoScaduto() {
+    if (!currentState || !currentState.pet || !PETQ.pet) return null;
+    var risveglio = PETQ.pet.controllaSveglia(currentState);
+    if (risveglio) {
+      PETQ.save.save(currentState);
+      disegnaStanzaEPet(currentState);
+      aggiornaHud(currentState);
+      renderAzioni();
+      mostraBalloon(PETQ.dialog.say(currentState.pet, risveglio.battuta, currentState));
+      return risveglio;
+    }
+    var crollato = PETQ.pet.controllaCrolloAutomatico(currentState);
+    if (crollato) {
+      PETQ.save.save(currentState);
+      disegnaStanzaEPet(currentState);
+      renderAzioni();
+    }
+    return null;
   }
 
   // ==================== INTRO ====================
@@ -384,6 +422,16 @@ window.PETQ = window.PETQ || {};
     hotzone.style.height = (HOTZONE_VASCA.h / ROOM_H * 100) + '%';
     canvasWrap.appendChild(hotzone);
 
+    // hotzone letto: evidenziata durante il drag del pet nel salone (stesso pattern vasca)
+    var hzLetto = hotzoneLetto();
+    var hotzoneL = el('div', 'petq-hotzone');
+    hotzoneL.id = 'petq-hotzone-letto';
+    hotzoneL.style.left = (hzLetto.x / ROOM_W * 100) + '%';
+    hotzoneL.style.top = (hzLetto.y / ROOM_H * 100) + '%';
+    hotzoneL.style.width = (hzLetto.w / ROOM_W * 100) + '%';
+    hotzoneL.style.height = (hzLetto.h / ROOM_H * 100) + '%';
+    canvasWrap.appendChild(hotzoneL);
+
     // indicatore "torna tra X" quando il pet è in missione
     var indicatore = el('div', 'petq-missione-ind');
     indicatore.id = 'petq-missione-ind';
@@ -445,7 +493,8 @@ window.PETQ = window.PETQ || {};
       ['Fame', state.pet.stats.fame],
       ['Igiene', state.pet.stats.igiene],
       ['Salute', state.pet.stats.salute],
-      ['Felicità', state.pet.stats.felicita]
+      ['Felicità', state.pet.stats.felicita],
+      ['Energia', state.pet.stats.energia]
     ];
 
     for (var i = 0; i < barre.length; i++) {
@@ -512,6 +561,12 @@ window.PETQ = window.PETQ || {};
     if (effetto && effetto.tipo === 'wash') {
       return { x: WASH_POS.x, y: WASH_POS.y };
     }
+    if (currentState && currentState.sonno) {
+      if (currentState.sonno.aLetto && currentStanza === 'salone') {
+        return { x: SLEEP_BED_POS.x, y: SLEEP_BED_POS.y };
+      }
+      return sleepFloorPos();
+    }
     var y = ROOM_H - PET_PX - 4 + (idleFrame === 1 ? 1 : 0);
     if (effetto && effetto.tipo === 'train' && idleFrame === 1) y -= 3; // bounce da allenamento
     return { x: Math.round((ROOM_W - PET_PX) / 2), y: y };
@@ -552,6 +607,7 @@ window.PETQ = window.PETQ || {};
       if (effetto && effetto.tipo === 'wash') overlaySchiuma(pctx, idleFrame);
       if (effetto && effetto.tipo === 'crumbs') overlayBriciole(pctx, idleFrame);
       if (effetto && effetto.tipo === 'cura') overlayCura(pctx, idleFrame);
+      if (state.sonno) overlaySonno(pctx, idleFrame);
 
       g.drawImage(petCanvas, pos.x, pos.y);
 
@@ -740,6 +796,24 @@ window.PETQ = window.PETQ || {};
     }
   }
 
+  // overlay sonno: palpebre chiuse + Zzz (API grafica con guard, stesso stile overlaySchiuma/Briciole)
+  function overlaySonno(ctx, frame) {
+    if (PETQ.sprites && PETQ.sprites.drawSonno) {
+      PETQ.sprites.drawSonno(ctx, frame);
+      return;
+    }
+    // fallback minimale: due trattini scuri (occhi chiusi) + una "z" sopra la testa
+    var s = ctx.canvas.width / PET_SIZE;
+    ctx.fillStyle = 'rgba(20,20,24,0.75)';
+    ctx.fillRect(3 * s, 6 * s, 4 * s, s);
+    ctx.fillRect(9 * s, 6 * s, 4 * s, s);
+    ctx.fillStyle = '#dfe4ec';
+    var zx = frame === 1 ? 12 : 10;
+    ctx.fillRect(zx * s, -1 * s, 3 * s, s);
+    ctx.fillRect((zx + 1) * s, 0, s, s);
+    ctx.fillRect(zx * s, s, 3 * s, s);
+  }
+
   // effetto infermeria: croce rossa + cuoricini sul canvas del pet (2 frame alternati)
   function overlayCura(ctx, frame) {
     var s = ctx.canvas.width / PET_SIZE;
@@ -825,6 +899,7 @@ window.PETQ = window.PETQ || {};
       // il countdown missione può azzerarsi tra un tick di gioco e l'altro (30s):
       // controlliamo anche qui così il ritorno è puntuale
       if (!animazioneInCorso && controllaMissioneScaduta()) return;
+      if (!animazioneInCorso) controllaSonnoScaduto();
       disegnaStanzaEPet(currentState);
     }, IDLE_MS);
   }
@@ -916,6 +991,13 @@ window.PETQ = window.PETQ || {};
     else hz.classList.remove('petq-hotzone-attiva');
   }
 
+  function evidenziaHotzoneLetto(on) {
+    var hz = document.getElementById('petq-hotzone-letto');
+    if (!hz) return;
+    if (on) hz.classList.add('petq-hotzone-attiva');
+    else hz.classList.remove('petq-hotzone-attiva');
+  }
+
   // ---------- interazioni sul canvas stanza (tap pet/poop, drag pet) ----------
 
   function poopSpots() {
@@ -965,8 +1047,9 @@ window.PETQ = window.PETQ || {};
       var dy = e.clientY - canvasPointer.startY;
       var dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (!canvasPointer.dragging && canvasPointer.target === 'pet' &&
-          currentStanza === 'bagno' && dist > 10) {
+      var puoTrascinare = canvasPointer.target === 'pet' && !currentState.sonno &&
+        (currentStanza === 'bagno' || currentStanza === 'salone');
+      if (!canvasPointer.dragging && puoTrascinare && dist > 10) {
         canvasPointer.dragging = true;
         petDragging = true;
         var rect = canvas.getBoundingClientRect();
@@ -975,7 +1058,8 @@ window.PETQ = window.PETQ || {};
           gc.width = PET_PX; gc.height = PET_PX;
           PETQ.sprites.draw(gc, petLikeDaState(currentState), { frame: 0 });
         });
-        evidenziaHotzone(true);
+        if (currentStanza === 'bagno') evidenziaHotzone(true);
+        else evidenziaHotzoneLetto(true);
         disegnaStanzaEPet(currentState);
       }
 
@@ -995,9 +1079,12 @@ window.PETQ = window.PETQ || {};
         petDragging = false;
         nascondiGhost();
         evidenziaHotzone(false);
+        evidenziaHotzoneLetto(false);
         var p = coordLogiche(canvas, e.clientX, e.clientY);
-        if (!annullato && dentroRect(p, HOTZONE_VASCA, 0)) {
+        if (!annullato && currentStanza === 'bagno' && dentroRect(p, HOTZONE_VASCA, 0)) {
           avviaLavaggio();
+        } else if (!annullato && currentStanza === 'salone' && dentroRect(p, hotzoneLetto(), 0)) {
+          provaAndareALetto();
         } else {
           disegnaStanzaEPet(currentState);
         }
@@ -1007,7 +1094,11 @@ window.PETQ = window.PETQ || {};
       if (annullato || cp.tapAnnullato) return;
 
       if (cp.target === 'pet') {
-        eseguiCoccola();
+        if (currentState.sonno) {
+          eseguiSveglia();
+        } else {
+          eseguiCoccola();
+        }
       } else if (cp.target === 'poop') {
         eseguiPuliziaBisogni(cp.poopIdx);
       }
@@ -1148,7 +1239,11 @@ window.PETQ = window.PETQ || {};
     aggiornaHud(currentState);
     disegnaStanzaEPet(currentState);
     renderAzioni();
-    if (risultato && risultato.msg) mostraBalloon(risultato.msg);
+    if (risultato && risultato.battutaPool) {
+      mostraBalloon(PETQ.dialog.say(currentState.pet, risultato.battutaPool, currentState));
+    } else if (risultato && risultato.msg) {
+      mostraBalloon(risultato.msg);
+    }
   }
 
   // ---------- azioni per stanza ----------

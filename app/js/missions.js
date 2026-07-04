@@ -211,6 +211,12 @@ window.PETQ = window.PETQ || {};
     if (state.missione) {
       return { ok: false, msg: 'Una missione e\' gia\' in corso.' };
     }
+    if (state.sonno) {
+      return { ok: false, msg: (state.pet && state.pet.nome ? state.pet.nome : 'Il pet') + ' sta dormendo.' };
+    }
+    if (PETQ.pet && PETQ.pet.energiaSottoSoglia && PETQ.pet.energiaSottoSoglia(state.pet)) {
+      return { ok: false, msg: 'Troppo stanco per partire in missione.', battutaPool: 'sonno' };
+    }
     var costo = scheda.costo || 0;
     if ((state.coins || 0) < costo) {
       return { ok: false, msg: 'Monete insufficienti.' };
@@ -504,6 +510,15 @@ window.PETQ = window.PETQ || {};
     if (!esito) {
       state.missione = null;
       return { ok: false, msg: 'Impossibile calcolare l\'esito della missione.' };
+    }
+
+    // Costo energia missione (GDD/bilanciamento.md "Energia e sonno"): 8 x ore di durata,
+    // clampato a 0 (mai sotto zero, mai reso "negativo" oltre il minimo della stat).
+    if (state.pet && state.pet.stats && PETQ.pet && PETQ.pet.bilEnergiaSonno) {
+      var es = PETQ.pet.bilEnergiaSonno();
+      var oreDurata = (scheda.durataMs || 0) / 3600000;
+      var costoEnergia = es.costoMissionePerOra * oreDurata;
+      state.pet.stats.energia = clamp((typeof state.pet.stats.energia === 'number' ? state.pet.stats.energia : 70) - costoEnergia, 0, 100);
     }
 
     var rewards = [];

@@ -139,9 +139,10 @@
     };
     PETQ.sprites._assertSpriteDims();
     if (PETQ.rooms._assertMappa) PETQ.rooms._assertMappa();
+    if (PETQ.rooms._assertSlots) PETQ.rooms._assertSlots();
     console.error = originalError;
     if (errors.length === 0) {
-      checkEl.textContent = "Check dimensioni: OK — sprite 16x16, icone 12x12, pin mappa dentro il canvas e senza sovrapposizioni.";
+      checkEl.textContent = "Check dimensioni: OK — sprite 16x16, icone 12x12, pin mappa e slot arredo dentro i canvas e senza sovrapposizioni (letto incluso).";
       checkEl.className = "ok";
     } else {
       checkEl.textContent = "Check dimensioni: FALLITO (" + errors.length + " errori, vedi console). " + errors.join(" | ");
@@ -358,13 +359,13 @@
       gridMappa.appendChild(cell);
     });
 
-    // ===== Arredi nelle stanze: una stanza per tema con 3 arredi campione + il topo =====
+    // ===== Arredi nelle stanze: salone con mensola/ganci (uno per supporto + topo), cucina/bagno legacy =====
     var gridArredi = document.getElementById("grid-arredi");
     var arrediDemo = [
-      { tema: "lab", stanza: "salone", arredi: ["Coppa Arcade", "Lampada da terra", "Topo allenatore"] },
-      { tema: "ship", stanza: "salone", arredi: ["Acquario di meduse", "Pattini da gara", "Piantina strana"] },
+      { tema: "lab", stanza: "salone", arredi: ["Coppa Arcade", "Poster motivazionale", "Topo allenatore"] },
+      { tema: "ship", stanza: "salone", arredi: ["Statuetta tipo Oscar", "Katane a farfalla", "Topo allenatore"] },
       { tema: "lab", stanza: "cucina", arredi: ["Tappeto morbido", "Frigo nuovo", "Arredo Sconosciuto (fallback)"] },
-      { tema: "ship", stanza: "bagno", arredi: ["Vasca idromassaggio", "Pesi", "Poster motivazionale"] }
+      { tema: "ship", stanza: "bagno", arredi: ["Vasca idromassaggio", "Pesi", "Pallone da calcio"] }
     ];
     arrediDemo.forEach(function (d) {
       var scale = 4;
