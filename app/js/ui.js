@@ -526,7 +526,9 @@ window.PETQ = window.PETQ || {};
     wrap.appendChild(hud);
 
     var tabs = el('div', 'petq-tabs');
-    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['camera', 'Camera'], ['missioni', 'Missioni']];
+    // PROTOTIPO 2, Blocco 7 — TAB NEGOZIO: nuova tab "Negozio" tra Camera e Missioni (comprare
+    // arredi decorativi/utility). Come Missioni, e' una schermata-menu senza canvas stanza.
+    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['camera', 'Camera'], ['negozio', 'Negozio'], ['missioni', 'Missioni']];
     for (var i = 0; i < stanze.length; i++) {
       (function (chiave, label) {
         var tab = el('button', 'petq-tab', label);
@@ -603,13 +605,14 @@ window.PETQ = window.PETQ || {};
     aggiornaTabsAttive();
     aggiornaHud(currentState);
 
-    // la tab Missioni è una schermata-menu: l'area stanza (canvas) resta nascosta
+    // le tab Missioni e Negozio sono schermate-menu: l'area stanza (canvas) resta nascosta
+    var soloMenu = (currentStanza === 'missioni' || currentStanza === 'negozio');
     var area = document.querySelector('.petq-stanza-area');
-    if (area) area.style.display = (currentStanza === 'missioni') ? 'none' : '';
+    if (area) area.style.display = soloMenu ? 'none' : '';
 
-    if (currentStanza !== 'missioni') disegnaStanzaEPet(currentState);
+    if (!soloMenu) disegnaStanzaEPet(currentState);
     renderAzioni();
-    if (currentStanza !== 'missioni' && !currentState.missione) battutaAutomatica();
+    if (!soloMenu && !currentState.missione) battutaAutomatica();
   }
 
   function aggiornaTabsAttive() {
@@ -1748,6 +1751,7 @@ window.PETQ = window.PETQ || {};
     if (currentStanza === 'cucina') renderAzioniCucina(azioni);
     else if (currentStanza === 'bagno') renderAzioniBagno(azioni);
     else if (currentStanza === 'camera') renderAzioniCamera(azioni);
+    else if (currentStanza === 'negozio') renderTabNegozio(azioni);
     else if (currentStanza === 'missioni') renderTabMissioni(azioni);
     else renderAzioniSalone(azioni);
   }
@@ -2419,6 +2423,150 @@ window.PETQ = window.PETQ || {};
     aggiornaHud(currentState);
     renderAzioni();
     if (r && r.msg) mostraToast(r.msg);
+  }
+
+  // ==================== TAB NEGOZIO (arredi) ====================
+  // PROTOTIPO 2, Blocco 7 — comprare arredi decorativi/utility. Vende SOLO gli arredi con
+  // "negozio N monete" nella colonna "Come si ottiene" di arredi.md (content.parseArredi li
+  // espone con prezzoNegozio numerico). Gli arredi-trofeo/perk delle missioni (Coppa, Completo
+  // martial artist, armi, Pattini da gara, ecc.) hanno prezzoNegozio null e NON compaiono qui:
+  // restano ricompense uniche delle missioni, altrimenti si svaluta l'economia missioni.
+  // Acquisto singolo: gli arredi decorativi sono unici, quindi se gia' posseduti/piazzati il
+  // bottone diventa "Già in collezione" (niente doppioni dal negozio — i doppioni restano una
+  // cosa dei drop missione, dove esiste gia' la rivendita al 50%).
+
+  // vero se l'arredo (per nome) e' tra i posseduti o i piazzati in una qualsiasi stanza.
+  function arredoGiaInCollezione(nome) {
+    var arr = (currentState && currentState.arredi) || {};
+    var posseduti = arr.posseduti || [];
+    for (var i = 0; i < posseduti.length; i++) {
+      if (posseduti[i].nome === nome) return true;
+    }
+    var piazzati = arr.piazzati || {};
+    var stanze = Object.keys(piazzati);
+    for (var s = 0; s < stanze.length; s++) {
+      var lista = piazzati[stanze[s]] || [];
+      for (var j = 0; j < lista.length; j++) {
+        if (lista[j].nome === nome) return true;
+      }
+    }
+    return false;
+  }
+
+  // riassunto breve del bonus/effetto per la riga negozio (riusa la colonna Bonus grezza).
+  function descriviBonusArredo(info) {
+    if (info && info.bonus && info.bonus !== '—' && info.bonus !== '-') return info.bonus;
+    return 'solo decorativo';
+  }
+
+  function renderTabNegozio(container) {
+    var wrap = el('div', 'petq-missione-card petq-shop-card');
+    wrap.appendChild(el('div', 'petq-missione-titolo', 'Negozio arredi'));
+    wrap.appendChild(el('div', 'petq-missione-meta',
+      'Compra arredi per la casa: finiscono nella tua Collezione (nel Salone), poi li piazzi nelle stanze. Monete: ' + (currentState.coins || 0) + '.'));
+
+    var data = window.PETQ.content && window.PETQ.content.data;
+    var arredi = (data && data.arredi) || [];
+
+    // comprabili = quelli con prezzoNegozio numerico (fonte "negozio N monete"), raggruppati
+    // per stanza di destinazione. Stanza sconosciuta/"ovunque" -> salone (coerente con la
+    // Collezione, che vive nel salone: v. rigaArredo).
+    var STANZE_ORD = ['cucina', 'bagno', 'salone', 'camera'];
+    var gruppi = { cucina: [], bagno: [], salone: [], camera: [] };
+    for (var i = 0; i < arredi.length; i++) {
+      var a = arredi[i];
+      if (typeof a.prezzoNegozio !== 'number') continue;
+      var stanza = (STANZE_ORD.indexOf(a.stanza) !== -1) ? a.stanza : 'salone';
+      gruppi[stanza].push(a);
+    }
+
+    var totale = 0;
+    for (var g = 0; g < STANZE_ORD.length; g++) {
+      var st = STANZE_ORD[g];
+      var lista = gruppi[st];
+      if (lista.length === 0) continue;
+      totale += lista.length;
+
+      wrap.appendChild(el('div', 'petq-shop-gruppo-titolo', capitalize(st)));
+      var box = el('div', 'petq-shop-lista');
+      for (var k = 0; k < lista.length; k++) {
+        box.appendChild(rigaNegozioArredo(lista[k], st));
+      }
+      wrap.appendChild(box);
+    }
+
+    if (totale === 0) {
+      wrap.appendChild(el('p', 'petq-vuoto', 'Nessun arredo in vendita al momento.'));
+    }
+
+    // TODO (PROTOTIPO 2, Blocco 7 — batch separato, richiede decisione di design del fondatore):
+    // qui va la sezione "Amplia slot" per comprare slot arredo aggiuntivi per stanza. Oggi sono
+    // 3 posizioni fisse disegnate per stanza (rooms.js SLOT_SPOTS): l'espansione richiede nuovi
+    // supporti disegnati + progressione prezzi, quindi resta fuori da questo batch.
+
+    container.appendChild(wrap);
+  }
+
+  function rigaNegozioArredo(info, stanza) {
+    var riga = el('div', 'petq-shop-riga');
+
+    var testi = el('div', 'petq-shop-info');
+    testi.appendChild(el('div', 'petq-cibo-nome', info.nome));
+    testi.appendChild(el('div', 'petq-cibo-effetti',
+      descriviBonusArredo(info) + ' — stanza: ' + stanza + ' — ' + info.prezzoNegozio + ' monete'));
+    riga.appendChild(testi);
+
+    var gia = arredoGiaInCollezione(info.nome);
+    if (gia) {
+      var giaBtn = el('button', 'petq-btn petq-btn-mini', 'Già in collezione');
+      giaBtn.disabled = true;
+      giaBtn.title = 'Arredo unico: lo possiedi già.';
+      riga.appendChild(giaBtn);
+      return riga;
+    }
+
+    var btn = el('button', 'petq-btn petq-btn-mini', 'Compra');
+    if ((currentState.coins || 0) < info.prezzoNegozio) {
+      btn.disabled = true;
+      btn.title = 'Monete insufficienti.';
+    }
+    btn.addEventListener('click', function () { eseguiAcquistoArredo(info, riga); });
+    riga.appendChild(btn);
+    return riga;
+  }
+
+  // Compra 1 arredo: rivalida prezzo e possesso (niente doppioni dal negozio, l'arredo e' unico),
+  // scala le monete e chiama arredi.aggiungi (finisce nei POSSEDUTI; il giocatore lo piazza poi
+  // dalla Collezione nella stanza giusta). Ridisegna la tab per aggiornare monete/stato bottone.
+  function eseguiAcquistoArredo(info, rigaEl) {
+    if (!currentState) return;
+    if (arredoGiaInCollezione(info.nome)) {
+      shakeCard(rigaEl);
+      mostraToast('Ce l\'hai già in collezione.');
+      renderAzioni();
+      return;
+    }
+    if (typeof info.prezzoNegozio !== 'number') {
+      shakeCard(rigaEl);
+      mostraToast('Questo arredo non è in vendita.');
+      return;
+    }
+    if ((currentState.coins || 0) < info.prezzoNegozio) {
+      shakeCard(rigaEl);
+      mostraToast('Monete insufficienti.');
+      return;
+    }
+    var r = PETQ.arredi.aggiungi(currentState, info.nome);
+    if (!r || !r.ok) {
+      shakeCard(rigaEl);
+      mostraToast((r && r.msg) || 'Acquisto non riuscito.');
+      return;
+    }
+    currentState.coins -= info.prezzoNegozio;
+    PETQ.save.save(currentState);
+    aggiornaHud(currentState);
+    renderAzioni();
+    mostraToast(info.nome + ' comprato: è nella Collezione (Salone), ora piazzalo nella stanza.');
   }
 
   // ==================== TAB MISSIONI ====================

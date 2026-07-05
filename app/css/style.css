@@ -792,6 +792,35 @@ button {
   flex: 0 0 auto;
 }
 
+/* ---------- TAB NEGOZIO arredi (PROTOTIPO 2, Blocco 7) ---------- */
+
+.petq-shop-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.petq-shop-gruppo-titolo {
+  font-weight: 700;
+  font-size: 13px;
+  color: #3ee6d0;
+  margin-top: 6px;
+}
+
+.petq-shop-riga {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #1c1f27;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.petq-shop-info {
+  min-width: 0;
+}
+
 /* ---------- Ferite (HUD) e dispensa ---------- */
 
 .petq-ferite {

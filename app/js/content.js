@@ -641,6 +641,14 @@ window.PETQ = window.PETQ || {};
         var fonte = c[4] || '';
         var mSostituisce = fonte.match(/sostituisce\s+(?:l['’]|la\s+|il\s+)?([A-Za-zÀ-ú]+)/i);
 
+        // prezzoNegozio (PROTOTIPO 2, Blocco 7 — TAB NEGOZIO): prezzo d'acquisto in monete se la
+        // colonna "Come si ottiene" dice "negozio N monete", null altrimenti. Solo gli arredi con
+        // questa fonte sono COMPRABILI: gli arredi da drop/perk/trofeo missione (che non hanno
+        // "negozio" nella fonte) restano ricompense uniche e NON vanno in vendita — cosi' non si
+        // svaluta l'economia missioni. Stesso pattern del prezzo di rivendita in arredi.js vendi().
+        var mPrezzo = fonte.match(/negozio\s+(\d+)/i);
+        var prezzoNegozio = mPrezzo ? parseInt(mPrezzo[1], 10) : null;
+
         out.push({
           nome: nome,
           stanza: (c[1] || '').toLowerCase(),
@@ -653,6 +661,7 @@ window.PETQ = window.PETQ || {};
           perk: estratto.perk,
           soloCollezione: estratto.soloCollezione,
           effettoSpeciale: estratto.effettoSpeciale,
+          prezzoNegozio: prezzoNegozio,
           sostituisceParziale: mSostituisce ? mSostituisce[1].trim() : null,
           sostituisce: null
         });
