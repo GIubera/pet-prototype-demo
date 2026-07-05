@@ -453,6 +453,42 @@ window.PETQ = window.PETQ || {};
     }
   };
 
+  // ===== Prop animazioni idle di personalita' (GDD "Personalita'" -> "Animazioni idle di
+  // personalita'", P1 leggero): 2 frame ciascuno, stesso stile outline+fill 12x12 dei prop
+  // sopra. cuboRubik (nerd b), note (gentile a), monete (maleducato a), boccaccia NON e' un
+  // prop ma un overlay sul volto del pet (v. drawBoccaccia sotto) quindi non e' qui dentro.
+  var IDLE_PROP_ICONS = {
+    // Cubo di Rubik (nerd, azione b): 2 frame con le facce colorate "spostate" per dare
+    // l'idea che il pet lo stia girando tra le mani.
+    cuborubik_0: {
+      px: ["............","............","..########..",".#rrrgggbb#.",".#rrrgggbb#.","..########..",".#yyywwwoo#.",".#yyywwwoo#.","..########..","............","............","............"],
+      pal: { "#": "#1a1a1a", r: "#d8402c", g: "#4aa84a", b: "#3a6ec4", y: "#e8d83c", w: "#f4f4f0", o: "#e8862c" }
+    },
+    cuborubik_1: {
+      px: ["............","............","..########..",".#gggbbrr#..",".#gggbbrr#..","..########..","..#wwwooyyy#","..#wwwooyyy#","..########..","............","............","............"],
+      pal: { "#": "#1a1a1a", r: "#d8402c", g: "#4aa84a", b: "#3a6ec4", y: "#e8d83c", w: "#f4f4f0", o: "#e8862c" }
+    },
+    // Note musicali (gentile, azione a): salgono (frame 1 piu' in alto), stile minimale.
+    note_0: {
+      px: ["............","...n........","...nn.......","...n.n......","..nn..n.....","............","......n.....","......nn....","......n.n...","............","............","............"],
+      pal: { n: "#f0d84a" }
+    },
+    note_1: {
+      px: ["...n........","...nn.......","...n.n......","..nn..n.....","............","......n.....","......nn....","......n.n...","............","............","............","............"],
+      pal: { n: "#f0d84a" }
+    },
+    // Mucchietto di monete (maleducato, azione a): la moneta in cima "si sposta" tra i due frame,
+    // come se il pet la stesse contando spostandola da una pila all'altra.
+    monete_0: {
+      px: ["............","............","............","............","......oo....","....ooooo...",".##ooooooo#.",".#ooooooooo.","...########.","............","............","............"],
+      pal: { "#": "#8a5c14", o: "#f0c23c" }
+    },
+    monete_1: {
+      px: ["............","............","............","....oo......","............","....ooooo...",".##ooooooo#.",".#ooooooooo.","...########.","............","............","............"],
+      pal: { "#": "#8a5c14", o: "#f0c23c" }
+    }
+  };
+
   function normalizzaNome(nome) {
     return String(nome || "").toLowerCase().replace(/\s+/g, "");
   }
@@ -489,6 +525,15 @@ window.PETQ = window.PETQ || {};
     drawIcon(canvas, PROP_ICONS[id] || PROP_ICONS.libro);
   }
 
+  // Prop delle animazioni idle di personalita' (GDD "Personalita'"): id 'cuborubik' | 'note' |
+  // 'monete' (2 frame ciascuno, v. IDLE_PROP_ICONS sopra). frame: 0|1. Usata da ui.js per il
+  // prop nuovo mostrato accanto al pet durante la mini-azione idle (nerd/gentile/maleducato).
+  function drawIdleProp(canvas, id, frame) {
+    if (!canvas) return;
+    var key = (id || "cuborubik") + "_" + (frame === 1 ? 1 : 0);
+    drawIcon(canvas, IDLE_PROP_ICONS[key] || IDLE_PROP_ICONS.cuborubik_0);
+  }
+
   // ===== Effetti overlay sul canvas del pet (griglia 16x16, scala presa da ctx.canvas) =====
   var FOAM_WHITE = "#ffffff", FOAM_AZURE = "#a8e0f0";
   var CRUMB_BROWN = "#8a5c2e", CRUMB_DARK = "#5c3a1e";
@@ -523,6 +568,27 @@ window.PETQ = window.PETQ || {};
       ctx.fillStyle = i % 2 === 0 ? CRUMB_BROWN : CRUMB_DARK;
       ctx.fillRect(x * s, y * s, s, s);
     });
+  }
+
+  // Boccaccia (idle personalita' maleducato, azione b): overlay sul volto, indipendente da
+  // razza/sottorazza come le palpebre sotto — copre la fascia occhi/bocca (righe 6-9, stesso
+  // terzo superiore usato da drawPalpebre) con "occhi storti" (due trattini in diagonale
+  // invece che orizzontali) + lingua rosa che sporge in basso. 2 frame: la lingua oscilla di
+  // 1px per dare l'idea del "bleh" ripetuto.
+  var LINGUA_COLOR = "#e8748c";
+  function drawBoccaccia(ctx, frame) {
+    if (!ctx) return;
+    var s = ctx.canvas.width / SIZE;
+    var f = frame === 1 ? 1 : 0;
+    // occhi storti: un pixel alto da un lato, basso dall'altro (invece della fascia dritta)
+    ctx.fillStyle = "rgba(20,20,24,0.85)";
+    ctx.fillRect(3 * s, (6 - f) * s, 2 * s, 1 * s);
+    ctx.fillRect(5 * s, 7 * s, 2 * s, 1 * s);
+    ctx.fillRect(9 * s, 7 * s, 2 * s, 1 * s);
+    ctx.fillRect(11 * s, (6 + f) * s, 2 * s, 1 * s);
+    // lingua fuori: rettangolo rosa che sporge dal "mento" verso il basso
+    ctx.fillStyle = LINGUA_COLOR;
+    ctx.fillRect(6 * s, 9 * s, 3 * s, (2 + f) * s);
   }
 
   // Palpebre chiuse (overlay sonno, GDD "Energia e sonno"): due trattini scuri sovrapposti
@@ -935,7 +1001,7 @@ window.PETQ = window.PETQ || {};
     checkFrame("RAT_PAURA", RAT_PAURA);
     checkFrame("RAT_AMICO", RAT_AMICO);
     // icone cibo e prop (12x12)
-    var iconSets = [["cibo", FOOD_ICONS], ["cibo-fallback", FOOD_FALLBACK], ["prop", PROP_ICONS]];
+    var iconSets = [["cibo", FOOD_ICONS], ["cibo-fallback", FOOD_FALLBACK], ["prop", PROP_ICONS], ["idle-prop", IDLE_PROP_ICONS]];
     iconSets.forEach(function (set) {
       for (var id in set[1]) {
         if (Object.prototype.hasOwnProperty.call(set[1], id)) {
@@ -973,6 +1039,8 @@ window.PETQ = window.PETQ || {};
     drawCrumbs: drawCrumbs,
     drawZzz: drawZzz,
     drawSonno: drawSonno,
+    drawIdleProp: drawIdleProp,
+    drawBoccaccia: drawBoccaccia,
     drawCartolina: drawCartolina,
     _cartoline: Object.keys(SCENE),
     // topo amichevole riusabile fuori dalle cartoline (arredo "allenatore" nelle stanze)

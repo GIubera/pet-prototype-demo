@@ -96,6 +96,44 @@ window.PETQ = window.PETQ || {};
   var balloonTimer = null;
   var toastTimer = null;
 
+  // ==================== Animazioni idle di personalita' (GDD "Personalita'" -> "Animazioni
+  // idle di personalita'", decisione fondatore 5 lug 2026, P1 versione leggera) ====================
+  // Quando il pet e' fermo in casa (sveglio, non in missione/allenamento, stanza normale,
+  // niente drag/animazione in corso) ogni tanto parte una mini-azione tipica della sua
+  // personalita' (2 per personalita', v. IDLE_ACTIONS sotto): un layer SOPRA la posa idle
+  // normale (respiro/blink/sporco/body variant restano intatti, v. disegnaStanzaEPet), per
+  // ~3-4s, poi torna tutto normale. Qualsiasi input (tap/drag/azione) la annulla subito
+  // (v. annullaIdleAction, richiamata da installaPointerCanvas e dai punti di ingresso delle
+  // azioni di gioco). idleAction: null | {id, personalita, startMs, durataMs}.
+  var idleAction = null;
+  var idleActionProssimaMs = 0; // Date.now() della prossima idle action programmata
+  var IDLE_ACTION_DURATA_MS = 3500;
+  var IDLE_ACTION_INTERVALLO_MIN_MS = 12000;
+  var IDLE_ACTION_INTERVALLO_MAX_MS = 20000;
+
+  // 2 azioni per personalita' (GDD): {id, prop:null|idIconaIdle|'libro'|'pesi', overlay:null|'boccaccia',
+  // muovi:null|'su_giu'|'sinistra_destra'}. "prop" riusa drawProp esistente per id noti
+  // (libro/pesi), altrimenti drawIdleProp (cubo/note/monete, nuovi). "overlay" e' un effetto
+  // sul volto/corpo (boccaccia) invece di un prop accanto.
+  var IDLE_ACTIONS = {
+    sportivo: [
+      { id: 'sportivo_allena', prop: 'pesi', muovi: 'su_giu' },
+      { id: 'sportivo_corre', prop: null, muovi: 'sinistra_destra' }
+    ],
+    nerd: [
+      { id: 'nerd_legge', prop: 'libro', muovi: null },
+      { id: 'nerd_cubo', prop: 'cuborubik', muovi: null }
+    ],
+    gentile: [
+      { id: 'gentile_canta', prop: 'note', muovi: null },
+      { id: 'gentile_disegna', prop: 'libro', muovi: null }
+    ],
+    maleducato: [
+      { id: 'maleducato_conta', prop: 'monete', muovi: null },
+      { id: 'maleducato_boccaccia', prop: null, overlay: 'boccaccia', muovi: null }
+    ]
+  };
+
   // effetto in corso sul canvas: null | {tipo:'crumbs'} | {tipo:'wash'} |
   // {tipo:'train', prop} | {tipo:'puff', x, y, step}
   var effetto = null;
@@ -484,6 +522,7 @@ window.PETQ = window.PETQ || {};
         tab.addEventListener('click', function () {
           controllaAnimScaduta();
           if (animazioneInCorso) return;
+          annullaIdleAction();
           currentStanza = chiave;
           renderStanza();
         });
@@ -688,7 +727,23 @@ window.PETQ = window.PETQ || {};
     var y = ROOM_H - PET_PX - 4 + (idleFrame === 1 ? 1 : 0);
     var inTrain = (effetto && effetto.tipo === 'train') || (currentState && currentState.allenamento);
     if (inTrain && idleFrame === 1) y -= 3; // bounce da allenamento
-    return { x: Math.round((ROOM_W - PET_PX) / 2), y: y };
+    var x = Math.round((ROOM_W - PET_PX) / 2);
+
+    // Animazioni idle di personalita' (GDD): micro-movimento SOPRA l'idle normale, sportivo
+    // (a) "si allena" = su/giu' piu' marcato del semplice respiro; (b) "corre per casa" =
+    // traslazione orizzontale su 2-3 posizioni (sinistra/centro/destra), il frame idleFrame
+    // (0|1, alterna ogni 500ms) scandisce i passi entro la durata dell'azione (~3.5s).
+    if (idleAction && idleAction.def) {
+      if (idleAction.def.muovi === 'su_giu') {
+        y -= (idleFrame === 1 ? 4 : 0); // squat/flessione piu' ampio del bounce allenamento
+      } else if (idleAction.def.muovi === 'sinistra_destra') {
+        var passo = Math.floor((Date.now() - idleAction.startMs) / (IDLE_ACTION_DURATA_MS / 4)) % 4;
+        var offsets = [-16, 0, 16, 0]; // sinistra -> centro -> destra -> centro
+        x += offsets[passo] || 0;
+        x = Math.max(2, Math.min(ROOM_W - PET_PX - 2, x));
+      }
+    }
+    return { x: x, y: y };
   }
 
   function disegnaStanzaEPet(state) {
@@ -742,6 +797,12 @@ window.PETQ = window.PETQ || {};
       if (effetto && effetto.tipo === 'wash') overlaySchiuma(pctx, idleFrame);
       if (effetto && effetto.tipo === 'crumbs') overlayBriciole(pctx, idleFrame);
       if (effetto && effetto.tipo === 'cura') overlayCura(pctx, idleFrame);
+      // Animazione idle di personalita' (GDD): overlay sul VOLTO (es. boccaccia del
+      // maleducato) — va disegnato sul mini-canvas del pet PRIMA di comporlo sulla stanza,
+      // stesso pattern degli altri overlay sopra (schiuma/briciole/cura).
+      if (idleAction && idleAction.def && idleAction.def.overlay === 'boccaccia' && PETQ.sprites.drawBoccaccia) {
+        PETQ.sprites.drawBoccaccia(pctx, idleFrame);
+      }
 
       g.drawImage(petCanvas, pos.x, pos.y);
 
@@ -756,6 +817,15 @@ window.PETQ = window.PETQ || {};
         propCanvas.height = 12;
         disegnaProp(propCanvas, propTrain);
         g.drawImage(propCanvas, Math.min(pos.x + PET_PX - 2, ROOM_W - 12), pos.y + PET_PX - 13);
+      }
+
+      // Prop dell'animazione idle di personalita' (GDD): nerd legge/cubo, gentile canta/
+      // disegna, maleducato conta i soldi — un prop accanto al pet per tutta la durata della
+      // mini-azione (~3.5s). "libro"/"pesi" riusano disegnaProp esistente; cubo/note/monete
+      // sono i 3 prop nuovi (v. sprites.js drawIdleProp). Nessun prop per le azioni "muovi"
+      // (si allena/corre) o "overlay" (boccaccia): quelle si vedono gia' nel movimento/volto.
+      if (idleAction && idleAction.def && idleAction.def.prop) {
+        disegnaIdleActionProp(g, idleAction.def.prop, pos);
       }
 
       lastPetRect = { x: pos.x, y: pos.y, w: PET_PX, h: PET_PX };
@@ -955,6 +1025,26 @@ window.PETQ = window.PETQ || {};
     g.fillRect(3, 3, 2, 1);
   }
 
+  // id: 'cuborubik' | 'note' | 'monete' (nuovi, v. sprites.js IDLE_PROP_ICONS) oppure
+  // 'libro' | 'pesi' (riusati da PROP_ICONS esistenti tramite disegnaProp). Disegnato accanto
+  // al pet nella stessa posizione angolare usata da propTrain sopra, cosi' i due prop non si
+  // accavallano mai (le condizioni di avvio dell'idle action escludono l'allenamento).
+  var IDLE_PROP_NUOVI = { cuborubik: true, note: true, monete: true };
+  function disegnaIdleActionProp(g, propId, pos) {
+    var propCanvas = document.createElement('canvas');
+    propCanvas.width = 12;
+    propCanvas.height = 12;
+    if (IDLE_PROP_NUOVI[propId] && PETQ.sprites && PETQ.sprites.drawIdleProp) {
+      PETQ.sprites.drawIdleProp(propCanvas, propId, idleFrame);
+    } else {
+      disegnaProp(propCanvas, propId);
+    }
+    // note musicali: sopra la testa (salgono); gli altri prop accanto/davanti come propTrain
+    var px = Math.min(pos.x + PET_PX - 2, ROOM_W - 12);
+    var py = (propId === 'note') ? Math.max(0, pos.y - 8) : pos.y + PET_PX - 13;
+    g.drawImage(propCanvas, px, py);
+  }
+
   function overlaySchiuma(ctx, frame) {
     if (PETQ.sprites && PETQ.sprites.drawFoam) {
       PETQ.sprites.drawFoam(ctx, frame);
@@ -1066,6 +1156,7 @@ window.PETQ = window.PETQ || {};
   function avviaIdle() {
     fermaIdle();
     idleFrame = 0;
+    programmaProssimaIdleAction();
     idleTimer = setInterval(function () {
       idleFrame = idleFrame === 0 ? 1 : 0;
       if (!currentState) return;
@@ -1074,6 +1165,7 @@ window.PETQ = window.PETQ || {};
       if (!animazioneInCorso && controllaMissioneScaduta()) return;
       if (!animazioneInCorso) controllaSonnoScaduto();
       if (!animazioneInCorso) controllaAllenamentoScaduto();
+      aggiornaIdleAction();
       disegnaStanzaEPet(currentState);
     }, IDLE_MS);
   }
@@ -1083,6 +1175,64 @@ window.PETQ = window.PETQ || {};
       clearInterval(idleTimer);
       idleTimer = null;
     }
+    idleAction = null;
+    idleActionProssimaMs = 0;
+  }
+
+  // ---------- idle action manager (animazioni idle di personalita') ----------
+
+  // Prossima idle action fra 12-20s (casualità, GDD): chiamata all'ingresso in casa e ogni
+  // volta che un'azione finisce/viene annullata, cosi' il ritmo resta "ogni tanto" invece che
+  // a orario fisso.
+  function programmaProssimaIdleAction() {
+    var attesa = IDLE_ACTION_INTERVALLO_MIN_MS +
+      PETQ.rng.rand() * (IDLE_ACTION_INTERVALLO_MAX_MS - IDLE_ACTION_INTERVALLO_MIN_MS);
+    idleActionProssimaMs = Date.now() + attesa;
+  }
+
+  // Condizioni GDD: pet fermo, sveglio, non in attivita'/missione, stanza normale (non la
+  // schermata-menu Missioni), nessun drag/animazione/gesto in corso. Stesso set di guardie
+  // usato altrove per "posso interagire col pet ora" (v. eseguiCoccola/provaAndareALetto).
+  function condizioniIdleActionOk() {
+    return !!currentState && !!currentState.pet &&
+      !currentState.sonno && !currentState.missione && !currentState.allenamento &&
+      currentStanza !== 'missioni' &&
+      !animazioneInCorso && !petDragging && !effetto &&
+      !canvasPointer && !foodPointer;
+  }
+
+  // Chiamata ad ogni tick idle (500ms, stesso ritmo di idleFrame): avvia una nuova idle
+  // action quando e' il momento ed e' possibile, oppure chiude quella in corso se scaduta o
+  // se le condizioni non sono piu' valide (es. e' arrivata una missione/il sonno).
+  function aggiornaIdleAction() {
+    if (idleAction) {
+      if (!condizioniIdleActionOk() || Date.now() - idleAction.startMs >= idleAction.durataMs) {
+        idleAction = null;
+        programmaProssimaIdleAction();
+      }
+      return;
+    }
+    if (!condizioniIdleActionOk()) return;
+    if (Date.now() < idleActionProssimaMs) return;
+
+    var personalita = currentState.pet.personalita;
+    var pool = IDLE_ACTIONS[personalita];
+    if (!pool || !pool.length) { programmaProssimaIdleAction(); return; }
+
+    var scelta = pool[PETQ.rng.randInt(0, pool.length - 1)];
+    idleAction = { id: scelta.id, def: scelta, personalita: personalita, startMs: Date.now(), durataMs: IDLE_ACTION_DURATA_MS };
+  }
+
+  // Annulla subito l'idle action in corso (GDD: "un tap/drag/azione qualsiasi la annulla"):
+  // richiamata dai punti di ingresso dei gesti/azioni sul canvas e sulle card. Se non c'e'
+  // nessuna azione in corso non fa nulla; in ogni caso NON riprogramma qui la prossima (lo fa
+  // aggiornaIdleAction al giro successivo) per evitare di far ripartire subito una nuova
+  // azione a raffica su input ripetuti (es. più tap veloci).
+  function annullaIdleAction() {
+    if (!idleAction) return;
+    idleAction = null;
+    programmaProssimaIdleAction();
+    if (currentState) disegnaStanzaEPet(currentState);
   }
 
   // ---------- balloon battute + toast ----------
@@ -1195,6 +1345,7 @@ window.PETQ = window.PETQ || {};
   function installaPointerCanvas(canvas) {
     canvas.addEventListener('pointerdown', function (e) {
       controllaAnimScaduta();
+      annullaIdleAction(); // GDD: qualsiasi tocco sulla scena annulla la mini-azione idle
       if (animazioneInCorso || !currentState) return;
       var p = coordLogiche(canvas, e.clientX, e.clientY);
 
@@ -1444,6 +1595,7 @@ window.PETQ = window.PETQ || {};
   // controllaAllenamentoScaduto), esattamente come le missioni mostrano "torna tra X".
   function avviaAllenamento(prop, cardEl) {
     if (animazioneInCorso) return;
+    annullaIdleAction();
     if (currentState.trainDay === oggiStr()) {
       mostraToast('Allenamento già fatto oggi.');
       return;
@@ -1578,6 +1730,7 @@ window.PETQ = window.PETQ || {};
 
   function apriFrigo() {
     if (!currentState || currentState.missione) return;
+    annullaIdleAction();
     frigoAperto = !frigoAperto;
     renderAzioni();
   }
@@ -1651,6 +1804,7 @@ window.PETQ = window.PETQ || {};
   function installaDragCibo(card, cibo, dispensaIdx) {
     card.addEventListener('pointerdown', function (e) {
       if (animazioneInCorso) return;
+      annullaIdleAction();
       foodPointer = {
         id: e.pointerId, cibo: cibo, card: card,
         startX: e.clientX, startY: e.clientY, dragging: false
@@ -1776,6 +1930,7 @@ window.PETQ = window.PETQ || {};
 
   function avviaCura() {
     if (animazioneInCorso || !currentState || currentState.missione) return;
+    annullaIdleAction();
     var r = PETQ.care.cura(currentState);
     if (!r.ok) {
       mostraToast(r.msg);
