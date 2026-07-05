@@ -131,7 +131,7 @@ Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da r
 |---|---|
 | Benessere | tutte a 70 |
 | RPG | budget di 3 punti base assegnati a caso una alla volta (impilabili sulla stessa stat), poi bonus di 1 alla stat "firma" |
-| Stat firma | gentile→Carisma, maleducato→Intelligenza, nerd→Intelligenza, sportivo→Forza — nerd e maleducato differenziati via item del tutorial (GameBit vs Fumetto sarcastico) |
+| Stat firma | gentile→Carisma, maleducato→**Velocità**, nerd→Intelligenza, sportivo→Forza (decisione fondatore 5 lug 2026: maleducato era Intelligenza, spostato a Velocità per differenziarlo dal nerd) |
 
 Nota per il parser (content.js parseBilanciamento): la riga "RPG" sopra deve contenere ESATTAMENTE due numeri — il primo è il budget, il secondo (ultimo) è il bonus firma. Totale iniziale = budget + firma (oggi 3+1=4). Se si aggiungono altri numeri a quella riga, il parser li legge male: tenerla pulita.
 

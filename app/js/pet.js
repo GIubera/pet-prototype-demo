@@ -3,11 +3,12 @@ window.PETQ = window.PETQ || {};
 (function () {
 
   // mappa personalità -> stat "firma" (bonus alla nascita); decisione di design
-  // presa da content/bilanciamento.md ("Stat iniziali alla generazione"),
-  // nerd e maleducato condividono Intelligenza finché il design non li differenzia
+  // presa da content/bilanciamento.md ("Stat iniziali alla generazione").
+  // maleducato -> Velocità (decisione fondatore 5 lug 2026, emersa progettando talenti/quest:
+  // era Intelligenza, ora differenziato dal nerd che resta Intelligenza).
   var STAT_FIRMA = {
     gentile: 'carisma',
-    maleducato: 'intelligenza',
+    maleducato: 'velocita',
     nerd: 'intelligenza',
     sportivo: 'forza'
   };
