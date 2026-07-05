@@ -489,6 +489,34 @@ window.PETQ = window.PETQ || {};
     }
   };
 
+  // Valigetta (PROTOTIPO 2, Blocco 2 "Partenza (valigia)"): sprite semplice 12x12, disegnato in
+  // scena accanto al pet quando e' in fase valigia (state.valigia). Valigia marrone con manico
+  // in alto, due borchie/chiusure dorate e una banda piu' scura. Stesso formato px/pal delle
+  // altre icone (drawIcon).
+  var VALIGETTA_ICON = {
+    px: [
+      "............",
+      "....####....",
+      "...#....#...",
+      "..########..",
+      ".#bbbbbbbb#.",
+      ".#bbggbbgg#.",
+      ".#bbbbbbbb#.",
+      ".#bBBBBBBb#.",
+      ".#bbbbbbbb#.",
+      "..########..",
+      "............",
+      "............"
+    ],
+    pal: { "#": "#3a2412", b: "#9c6a34", B: "#6e4a22", g: "#f0c23c" }
+  };
+
+  // Disegna la valigetta su un canvas (di solito 12x12 o 24x24, la scala si adatta come drawIcon).
+  function drawValigetta(canvas) {
+    if (!canvas) return;
+    drawIcon(canvas, VALIGETTA_ICON);
+  }
+
   function normalizzaNome(nome) {
     return String(nome || "").toLowerCase().replace(/\s+/g, "");
   }
@@ -1009,6 +1037,7 @@ window.PETQ = window.PETQ || {};
         }
       }
     });
+    checkFrame("valigetta", VALIGETTA_ICON.px, ICON_SIZE);
   }
 
   function checkFrame(name, frame, size) {
@@ -1041,6 +1070,7 @@ window.PETQ = window.PETQ || {};
     drawSonno: drawSonno,
     drawIdleProp: drawIdleProp,
     drawBoccaccia: drawBoccaccia,
+    drawValigetta: drawValigetta,
     drawCartolina: drawCartolina,
     _cartoline: Object.keys(SCENE),
     // topo amichevole riusabile fuori dalle cartoline (arredo "allenatore" nelle stanze)

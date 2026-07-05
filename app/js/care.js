@@ -448,6 +448,19 @@ window.PETQ = window.PETQ || {};
       PETQ.arredi.scadiTemporanei(state);
     }
 
+    // Valigia / partenza (PROTOTIPO 2, Blocco 2): al NUOVO GIORNO valuta i trigger (2 giorni
+    // critici consecutivi da teen -> fase valigia), la finestra di rimedio (rimedio -> rientro,
+    // ancora critico -> partenza). Valutata QUI, dopo che giorniVita e' avanzato e le stat/ferite
+    // del nuovo giorno sono aggiornate (guarigione naturale sopra). L'evento risultante e' messo
+    // in state.eventoValigia perche' dailyLogin ritorna gia' le monete (bonus): la UI legge
+    // state.eventoValigia dopo il login per mostrare valigetta/rientro/addio (v. ui.js
+    // controllaEventoValigia, stesso pattern di esitoMissioneGiorno). null = nessun evento.
+    // Nota: NON lo si valuta se il pet e' gia' partito (state.petPartito valorizzato / state.pet
+    // assente) — in quel caso dailyLogin ritorna prima (sopra, sui rami state.pet).
+    if (PETQ.pet && typeof PETQ.pet.valutaValigiaNuovoGiorno === 'function' && state.pet) {
+      state.eventoValigia = PETQ.pet.valutaValigiaNuovoGiorno(state);
+    }
+
     return bonus;
   }
 

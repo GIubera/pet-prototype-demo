@@ -483,6 +483,224 @@ window.PETQ = window.PETQ || {};
     return true;
   }
 
+  // ==================== VALIGIA / PARTENZA (PROTOTIPO 2, Blocco 2 / GDD "Ciclo di vita: uscite")
+  // ===============================================================================================
+  // Ciclo (design VINCOLANTE, docs/PROTOTIPO-2.md "Blocco 2 — Partenza (valigia)"):
+  //   normale --(2 giorni critici consecutivi, solo teen)--> FASE VALIGIA
+  //   FASE VALIGIA --(rimedio: stat sopra soglia al nuovo giorno)--> normale (battuta 'rientro')
+  //   FASE VALIGIA --(ancora critico al nuovo giorno successivo)--> PARTENZA (battuta 'addio')
+  //   PARTITO --("Fai ammenda", 50 monete)--> normale (Salute/Felicita' a 50, battuta 'rientro')
+  //
+  // Stato (migrazione: null/0 sui salvataggi vecchi, v. save.js/main.js):
+  //   state.valigiaTrig = { fel, sal, doppio }  -> per ciascun trigger, da quanti NUOVI GIORNI
+  //                                                consecutivi la condizione e' vera (reset a 0
+  //                                                appena rientra sopra soglia).
+  //   state.valigia     = null | { daGiorno: giorniVita }  -> fase valigia attiva; daGiorno = il
+  //                                                giorniVita a cui e' iniziata (serve per la
+  //                                                finestra di rimedio, v. sotto).
+  //   state.petPartito  = null | <oggetto pet>  -> il pet che se n'e' andato (state.pet viene
+  //                                                svuotato alla partenza; l'ammenda lo ripristina).
+  //
+  // Le TRE soglie (OR — basta UNA vera per 2 giorni): Felicita'<20, Salute<20, oppure
+  // Salute<35 E Felicita'<35 insieme (il "doppio malessere" moderato). SOLO da teen, MAI baby.
+  var SOGLIA_VALIGIA_FEL = 20;      // (a) Felicita' < 20
+  var SOGLIA_VALIGIA_SAL = 20;      // (b) Salute < 20
+  var SOGLIA_VALIGIA_DOPPIO = 35;   // (c) Salute < 35 E Felicita' < 35 insieme
+  var GIORNI_TRIGGER_VALIGIA = 2;   // 2 giorni di gioco consecutivi -> fase valigia
+  // Finestra di rimedio: quanti NUOVI GIORNI di gioco il pet resta in fase valigia (ultimo
+  // avvertimento) prima di partire, se non rimedia. 1 = al PRIMO nuovo giorno dopo l'ingresso
+  // in fase valigia si decide (rientro se rimediato, partenza altrimenti). Proposta del brief.
+  var GIORNI_FINESTRA_RIMEDIO = 1;
+  // Ammenda (Blocco 2, recupero minimo — il pianeta/lettera sono un batch successivo): costo e
+  // stat di rientro. Numeri dal brief; monetePartenza (50) e' anche in bilanciamento.md ma qui
+  // usiamo una costante dedicata cosi' il costo dell'ammenda e' indipendente dal saldo iniziale.
+  var COSTO_AMMENDA = 50;
+  var STAT_RIENTRO_AMMENDA = 50;    // Salute e Felicita' riportate a 50 al ritorno
+
+  // true se lo STATO di cura del pet e' "critico" secondo almeno una delle tre soglie valigia.
+  // Usata sia per contare i giorni consecutivi (trigger) sia per decidere rimedio/partenza in
+  // fase valigia (il "rimedio" e' semplicemente: NON piu' critico).
+  function condizioneValigiaCritica(pet) {
+    if (!pet || !pet.stats) return false;
+    var fel = pet.stats.felicita;
+    var sal = pet.stats.salute;
+    if (fel < SOGLIA_VALIGIA_FEL) return true;                                  // (a)
+    if (sal < SOGLIA_VALIGIA_SAL) return true;                                  // (b)
+    if (sal < SOGLIA_VALIGIA_DOPPIO && fel < SOGLIA_VALIGIA_DOPPIO) return true; // (c)
+    return false;
+  }
+
+  function inFaseValigia(state) {
+    return !!(state && state.valigia);
+  }
+
+  function petPartito(state) {
+    return !!(state && state.petPartito);
+  }
+
+  // Garantisce la struttura dei contatori trigger (migrazione difensiva).
+  function assicuraValigiaTrig(state) {
+    if (!state) return { fel: 0, sal: 0, doppio: 0 };
+    if (!state.valigiaTrig || typeof state.valigiaTrig !== 'object') {
+      state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    }
+    if (typeof state.valigiaTrig.fel !== 'number') state.valigiaTrig.fel = 0;
+    if (typeof state.valigiaTrig.sal !== 'number') state.valigiaTrig.sal = 0;
+    if (typeof state.valigiaTrig.doppio !== 'number') state.valigiaTrig.doppio = 0;
+    return state.valigiaTrig;
+  }
+
+  function entraFaseValigia(state) {
+    if (!state || !state.pet) return false;
+    var giorni = (typeof state.pet.giorniVita === 'number') ? state.pet.giorniVita : 0;
+    state.valigia = { daGiorno: giorni };
+    // azzera i contatori trigger: la fase valigia e' iniziata, il conteggio "verso la valigia"
+    // non serve piu' (il prossimo check e' rimedio-vs-partenza, non piu' accumulo).
+    state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    return true;
+  }
+
+  // Uscita dalla fase valigia per RIMEDIO (il giocatore ha risollevato le stat): torna tutto
+  // normale, i contatori restano a zero. La battuta 'rientro' la mostra la UI.
+  function esciFaseValigia(state) {
+    if (!state) return false;
+    state.valigia = null;
+    state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    return true;
+  }
+
+  // Partenza: il pet lascia la casa. Salva l'oggetto pet in state.petPartito e SVUOTA lo stato
+  // attivo (state.pet = null), cosi' la casa mostra la schermata "pet partito". Azzera anche le
+  // strutture legate al pet in casa (sonno/allenamento/missione) per non lasciare stato rotto.
+  // La schermata addio (battuta 'addio' + flavor per razza) la mostra la UI, che chiama questa
+  // funzione DOPO aver letto pet/battuta.
+  function partePet(state) {
+    if (!state || !state.pet) return false;
+    state.petPartito = state.pet;
+    state.pet = null;
+    state.valigia = null;
+    state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    state.sonno = null;
+    state.allenamento = null;
+    state.missione = null;
+    return true;
+  }
+
+  // Valuta il ciclo valigia AL NUOVO GIORNO (chiamata da care.dailyLogin, dopo l'avanzamento di
+  // giorniVita). Ritorna un "evento" per la UI o null se non succede nulla di visibile:
+  //   { tipo: 'valigia' }   -> il pet e' appena ENTRATO in fase valigia (mostra valigetta+notifica)
+  //   { tipo: 'rientro' }   -> era in fase valigia e ha RIMEDIATO (mostra battuta rientro)
+  //   { tipo: 'partenza' }  -> era in fase valigia e non ha rimediato -> PARTE (mostra addio)
+  //   null                  -> nessun cambiamento (accumulo trigger o nulla)
+  // Regole: solo teen (mai baby); se il pet e' gia' partito non fa nulla.
+  function valutaValigiaNuovoGiorno(state) {
+    if (!state || !state.pet) return null;
+    var pet = state.pet;
+    assicuraValigiaTrig(state);
+
+    // Baby: MAI valigia (GDD). Azzeriamo comunque i contatori cosi' non "eredita" giorni critici
+    // accumulati da baby quando poi diventa teen (i 2 giorni devono essere da teen).
+    if (pet.stadio !== 'teen') {
+      state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+      // per sicurezza: un baby non puo' essere in fase valigia (non ci entra mai), ma se un
+      // salvataggio incoerente lo fosse, lo togliamo silenziosamente.
+      if (state.valigia) state.valigia = null;
+      return null;
+    }
+
+    var giorni = (typeof pet.giorniVita === 'number') ? pet.giorniVita : 0;
+
+    // --- Gia' in fase valigia: finestra di rimedio ---
+    if (state.valigia) {
+      var daGiorno = (typeof state.valigia.daGiorno === 'number') ? state.valigia.daGiorno : giorni;
+      // Non e' ancora passato abbastanza tempo in fase valigia: resta in attesa (ultimo
+      // avvertimento ancora in corso). Con GIORNI_FINESTRA_RIMEDIO=1, alla PRIMA valutazione
+      // del nuovo giorno dopo l'ingresso (giorni > daGiorno) si decide.
+      if ((giorni - daGiorno) < GIORNI_FINESTRA_RIMEDIO) {
+        return null;
+      }
+      if (!condizioneValigiaCritica(pet)) {
+        esciFaseValigia(state);
+        return { tipo: 'rientro' };
+      }
+      partePet(state);
+      return { tipo: 'partenza' };
+    }
+
+    // --- Non in fase valigia: accumulo dei contatori trigger ---
+    var t = state.valigiaTrig;
+    var fel = pet.stats.felicita;
+    var sal = pet.stats.salute;
+
+    t.fel = (fel < SOGLIA_VALIGIA_FEL) ? (t.fel + 1) : 0;
+    t.sal = (sal < SOGLIA_VALIGIA_SAL) ? (t.sal + 1) : 0;
+    t.doppio = (sal < SOGLIA_VALIGIA_DOPPIO && fel < SOGLIA_VALIGIA_DOPPIO) ? (t.doppio + 1) : 0;
+
+    if (t.fel >= GIORNI_TRIGGER_VALIGIA ||
+        t.sal >= GIORNI_TRIGGER_VALIGIA ||
+        t.doppio >= GIORNI_TRIGGER_VALIGIA) {
+      entraFaseValigia(state);
+      return { tipo: 'valigia' };
+    }
+
+    return null;
+  }
+
+  // Debug "Forza valigia": entra subito in fase valigia (se teen e non gia' in valigia/partito).
+  function debugForzaValigia(state) {
+    if (!state || !state.pet) return false;
+    if (state.pet.stadio !== 'teen') return false;
+    if (state.valigia || state.petPartito) return false;
+    return entraFaseValigia(state);
+  }
+
+  // Debug "Forza partenza": fa partire il pet SUBITO (bypassa la finestra), se c'e' un pet in casa.
+  function debugForzaPartenza(state) {
+    if (!state || !state.pet) return false;
+    return partePet(state);
+  }
+
+  // "Fai ammenda" (Blocco 2, recupero minimo): riporta il pet partito in casa spendendo
+  // COSTO_AMMENDA monete. Ripristina state.pet da state.petPartito, Salute e Felicita' a 50,
+  // ricalcola la Salute, azzera le strutture valigia. Ritorna { ok, msg }. La battuta 'rientro'
+  // la mostra la UI sul pet ripristinato.
+  function faiAmmenda(state) {
+    if (!state) return { ok: false, msg: 'errore interno' };
+    if (!state.petPartito) return { ok: false, msg: 'Non c\'e\' nessun pet da far tornare.' };
+    if ((state.coins || 0) < COSTO_AMMENDA) {
+      return { ok: false, msg: 'Ti servono ' + COSTO_AMMENDA + ' monete per farlo tornare.' };
+    }
+    var pet = state.petPartito;
+    state.coins = (state.coins || 0) - COSTO_AMMENDA;
+    state.pet = pet;
+    state.petPartito = null;
+    state.valigia = null;
+    state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+
+    // Felicita' e Salute riportate a 50. La Salute non e' una stat "diretta" (deriva da
+    // Ferite + malus condizioni): la riportiamo a 50 azzerando le Ferite e resettando i
+    // tracking dei malus condizioni prolungati, cosi' recomputeSalute non la ributta subito
+    // sotto. La Felicita' invece si setta direttamente.
+    pet.stats.felicita = STAT_RIENTRO_AMMENDA;
+    state.ferite = 0;
+    state.fameBassaDaMs = null;
+    state.igieneBassaDaMs = null;
+    state.energiaBassaDaMs = null;
+    // se anche fame/igiene/energia sono a zero, portiamole almeno a 50 cosi' il pet non ripiomba
+    // in condizione critica al primo tick e riparte davvero "con una seconda chance".
+    if (pet.stats.salute < STAT_RIENTRO_AMMENDA) {
+      if (pet.stats.fame < STAT_RIENTRO_AMMENDA) pet.stats.fame = STAT_RIENTRO_AMMENDA;
+      if (pet.stats.igiene < STAT_RIENTRO_AMMENDA) pet.stats.igiene = STAT_RIENTRO_AMMENDA;
+      if (typeof pet.stats.energia === 'number' && pet.stats.energia < STAT_RIENTRO_AMMENDA) pet.stats.energia = STAT_RIENTRO_AMMENDA;
+    }
+    recomputeSalute(pet, state);
+    // clamp finale: se dopo il recompute la Salute risulta comunque sotto 50 (non dovrebbe, con
+    // ferite=0 e malus azzerati), la forziamo a 50 come richiesto dal brief.
+    if (pet.stats.salute < STAT_RIENTRO_AMMENDA) pet.stats.salute = STAT_RIENTRO_AMMENDA;
+
+    return { ok: true, msg: (pet.nome || 'Il pet') + ' e\' tornato a casa.' };
+  }
+
   // ==================== Energia e sonno (GDD "Energia e sonno") ====================
   // state.sonno = null | { modalita: 'riposino'|'notturno', aLetto: bool, oreDormite: number }.
   // "Dormire" e' un unico gesto (drag sul letto) con due modalita' a seconda dell'OROLOGIO DI
@@ -681,9 +899,23 @@ window.PETQ = window.PETQ || {};
     controllaAllenamentoScaduto: controllaAllenamentoScaduto,
     controllaEvoluzione: controllaEvoluzione,
     ritiraTalenti: ritiraTalenti,
+    // Valigia / partenza (Blocco 2)
+    valutaValigiaNuovoGiorno: valutaValigiaNuovoGiorno,
+    condizioneValigiaCritica: condizioneValigiaCritica,
+    inFaseValigia: inFaseValigia,
+    petPartito: petPartito,
+    assicuraValigiaTrig: assicuraValigiaTrig,
+    faiAmmenda: faiAmmenda,
+    debugForzaValigia: debugForzaValigia,
+    debugForzaPartenza: debugForzaPartenza,
     _risolviRisveglio: risolviRisveglio,
     _giorniEvoluzioneTeen: GIORNI_EVOLUZIONE_TEEN,
-    _soglieCiccionePerStadio: SOGLIE_CICCIONE_PER_STADIO
+    _soglieCiccionePerStadio: SOGLIE_CICCIONE_PER_STADIO,
+    _costoAmmenda: COSTO_AMMENDA,
+    _sogliaValigiaFel: SOGLIA_VALIGIA_FEL,
+    _sogliaValigiaSal: SOGLIA_VALIGIA_SAL,
+    _sogliaValigiaDoppio: SOGLIA_VALIGIA_DOPPIO,
+    _giorniTriggerValigia: GIORNI_TRIGGER_VALIGIA
   };
 
 })();

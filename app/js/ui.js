@@ -233,6 +233,11 @@ window.PETQ = window.PETQ || {};
   function boot(state) {
     if (state) {
       currentState = state;
+      // Pet partito (PROTOTIPO 2, Blocco 2): se non c'e' un pet in casa (state.pet null e
+      // state.petPartito valorizzato) la casa mostra la schermata "pet partito" col bottone
+      // "Fai ammenda", non il gioco normale. Va controllato PRIMA di tutto il resto (sonno/
+      // missione/evoluzione presuppongono un pet in scena).
+      if (petAssente(state)) { mostraPetPartito(state); return; }
       controllaSonnoScaduto();
       controllaAllenamentoScaduto();
       // apertura app con missione già finita: risolvi e mostra subito l'esito
@@ -240,6 +245,8 @@ window.PETQ = window.PETQ || {};
       // evoluzione baby->teen maturata offline (es. tanti "giorni" passati mentre l'app era
       // chiusa): prende il controllo e mostra la schermata dedicata prima della casa.
       if (controllaEvoluzioneScaduta()) return;
+      // evento valigia maturato offline (login giornaliero al boot): valigetta/rientro/addio.
+      if (controllaEventoValigia()) return;
       mostraCasa(state);
     } else {
       mostraIntro();
@@ -249,15 +256,29 @@ window.PETQ = window.PETQ || {};
   function render(state) {
     if (!state) return;
     currentState = state;
+    // Pet partito: se durante un tick il pet e' partito (es. partenza maturata al nuovo giorno
+    // mentre l'app e' aperta), passiamo alla schermata dedicata. controllaEventoValigia sotto
+    // mostra l'addio; qui gestiamo il caso in cui siamo gia' oltre (pet assente, nessun evento).
+    if (petAssente(state) && !state.eventoValigia) {
+      if (!document.getElementById('petq-pet-partito')) mostraPetPartito(state);
+      return;
+    }
     controllaAnimScaduta();
     controllaSonnoScaduto();
     controllaAllenamentoScaduto();
     if (!animazioneInCorso && controllaMissioneScaduta()) return;
     if (!animazioneInCorso && controllaEvoluzioneScaduta()) return;
+    if (!animazioneInCorso && controllaEventoValigia()) return;
     if (document.getElementById('petq-casa')) {
       aggiornaHud(state);
       disegnaStanzaEPet(state);
     }
+  }
+
+  // Pet assente = non c'e' un pet in casa (partito). Guardia usata dai punti di ingresso della
+  // UI per deviare alla schermata "pet partito" (v. mostraPetPartito).
+  function petAssente(state) {
+    return !!(state && !state.pet && state.petPartito);
   }
 
   // Se la missione in corso è finita (tempoRimasto <= 0), la risolve, salva e mostra la
@@ -491,7 +512,13 @@ window.PETQ = window.PETQ || {};
       // Negozio unico (GDD "Economia" -> "Spesa e dispensa"): il pin Negozio (m0) sblocca il
       // menu acquisto SOLO dopo il tutorial. Finche' e' false, tap su m0 = tutorial.
       negozioSbloccato: false,
-      sonno: null
+      sonno: null,
+      // Valigia / partenza (PROTOTIPO 2, Blocco 2): contatori trigger, fase valigia, pet partito
+      // ed evento per la UI. Partono azzerati/null (v. pet.js valutaValigiaNuovoGiorno).
+      valigiaTrig: { fel: 0, sal: 0, doppio: 0 },
+      valigia: null,
+      petPartito: null,
+      eventoValigia: null
     };
     // orologio di gioco: parte dall'ora REALE corrente (stessa regola di migrazione dei
     // salvataggi esistenti, v. clock.js inizializzaOrologio), cosi' anche una partita nuova
@@ -873,6 +900,20 @@ window.PETQ = window.PETQ || {};
       // (si allena/corre) o "overlay" (boccaccia): quelle si vedono gia' nel movimento/volto.
       if (idleAction && idleAction.def && idleAction.def.prop) {
         disegnaIdleActionProp(g, idleAction.def.prop, pos);
+      }
+
+      // Valigetta (PROTOTIPO 2, Blocco 2): quando il pet e' in fase valigia (state.valigia) sta
+      // preparando la valigia -> compare una valigetta accanto a lui (a terra, sul lato). Solo
+      // se il pet e' sveglio e visibile in scena (questo ramo). Non durante missione/sonno
+      // (rami sopra, che non arrivano qui). La disegniamo a sinistra del pet, appoggiata al
+      // suo livello dei piedi, clampata dentro il canvas.
+      if (state.valigia && !state.sonno && !state.missione && PETQ.sprites && PETQ.sprites.drawValigetta) {
+        var valCanvas = document.createElement('canvas');
+        valCanvas.width = 12; valCanvas.height = 12;
+        PETQ.sprites.drawValigetta(valCanvas);
+        var vx = Math.max(1, pos.x - 12);
+        var vy = pos.y + PET_PX - 12;
+        g.drawImage(valCanvas, vx, vy);
       }
 
       lastPetRect = { x: pos.x, y: pos.y, w: PET_PX, h: PET_PX };
@@ -1317,6 +1358,10 @@ window.PETQ = window.PETQ || {};
   }
 
   function situazionePrioritaria(pet) {
+    // Fase valigia (PROTOTIPO 2, Blocco 2): mentre il pet prepara la valigia girano le battute
+    // del pool 'valigia' (e' l'ultimo avvertimento, ha la priorita' massima). Letto da
+    // currentState perche' la fase valigia e' uno stato di partita, non del solo pet.
+    if (currentState && currentState.valigia) return 'valigia';
     var soglie = (bilanciamento().soglie) || { critica: 25 };
     var critica = (typeof soglie.critica === 'number') ? soglie.critica : 25;
     if (pet.stats.fame < critica) return 'fame';
@@ -1750,6 +1795,15 @@ window.PETQ = window.PETQ || {};
     var azioni = document.getElementById('petq-azioni');
     if (!azioni || !currentState) return;
     azioni.innerHTML = '';
+
+    // Fase valigia (PROTOTIPO 2, Blocco 2): avviso in testa alle azioni in OGNI stanza — e'
+    // l'ultimo avvertimento, il giocatore deve rimediare (Felicità e Salute sopra soglia) prima
+    // del prossimo nuovo giorno o il pet parte.
+    if (currentState.valigia && currentState.pet) {
+      var nomeV = currentState.pet.nome || 'Il pet';
+      azioni.appendChild(el('p', 'petq-valigia-avviso',
+        '⚠ ' + nomeV + ' ha preparato la valigia! Risolleva Felicità e Salute prima del prossimo giorno, o se ne andrà.'));
+    }
 
     if (currentStanza === 'cucina') renderAzioniCucina(azioni);
     else if (currentStanza === 'bagno') renderAzioniBagno(azioni);
@@ -3364,6 +3418,218 @@ window.PETQ = window.PETQ || {};
     return true;
   }
 
+  // ==================== VALIGIA / PARTENZA (PROTOTIPO 2, Blocco 2) ====================
+  // Legge state.eventoValigia (impostato da care.dailyLogin via pet.valutaValigiaNuovoGiorno) e
+  // reagisce: 'partenza' -> schermata addio (prende il controllo, ritorna true); 'valigia' ->
+  // notifica in-gioco + battuta (resta in casa, ritorna false cosi' il rendering prosegue e la
+  // valigetta appare in scena); 'rientro' -> battuta rientro (resta in casa, false). Consuma
+  // sempre l'evento (lo azzera) cosi' non si ripete. Stesso pattern idempotente di
+  // controllaEvoluzioneScaduta: chiamata da boot/render/tick e dopo il "Nuovo giorno" debug.
+  function controllaEventoValigia() {
+    if (!currentState) return false;
+    var ev = currentState.eventoValigia;
+    if (!ev) return false;
+    currentState.eventoValigia = null;
+    PETQ.save.save(currentState);
+
+    if (ev.tipo === 'partenza') {
+      mostraAddio(currentState);
+      return true;
+    }
+    if (ev.tipo === 'valigia') {
+      // Entrato in fase valigia: notifica in-gioco (usa una battuta 'notifica_valigia' come
+      // avviso) + battuta 'valigia' nel balloon. La valigetta in scena la disegna
+      // disegnaStanzaEPet (legge state.valigia). Se la casa non e' ancora montata (evento al
+      // boot), montiamo la casa prima cosi' il balloon/scena esistono.
+      if (!document.getElementById('petq-casa')) mostraCasa(currentState);
+      if (currentState.pet) {
+        var avviso = PETQ.dialog.say(currentState.pet, 'notifica_valigia', currentState);
+        mostraToast(avviso);
+        disegnaStanzaEPet(currentState);
+        renderAzioni();
+        mostraBalloon(PETQ.dialog.say(currentState.pet, 'valigia', currentState));
+      }
+      return false;
+    }
+    if (ev.tipo === 'rientro') {
+      if (!document.getElementById('petq-casa')) mostraCasa(currentState);
+      if (currentState.pet) {
+        disegnaStanzaEPet(currentState);
+        renderAzioni();
+        mostraBalloon(PETQ.dialog.say(currentState.pet, 'rientro', currentState));
+      }
+      return false;
+    }
+    return false;
+  }
+
+  // Flavor della partenza per razza (Blocco 2 / GDD "Ciclo di vita": l'alieno recuperato da una
+  // navetta del suo pianeta, il robot da un drone verso il centro di manutenzione). Tinta + testo
+  // (+ mini-sprite del mezzo) — niente scena elaborata, come da brief ("basta tinta + testo").
+  var ADDIO_FLAVOR = {
+    alieno: { titolo: 'È partito', mezzo: 'La navetta del suo pianeta è scesa a riprenderlo.', tinta: '#3a2f5f', mezzoTinta: '#8a6ff0' },
+    robot: { titolo: 'È partito', mezzo: 'Un drone di recupero lo ha portato al centro di manutenzione.', tinta: '#2f3a4a', mezzoTinta: '#7fb0e0' }
+  };
+
+  // Schermata ADDIO dedicata: il pet parte davvero. Mostra la battuta 'addio' della personalita',
+  // il flavor per razza (navetta/drone: tinta + testo + mini-sprite del mezzo) e un bottone che
+  // porta alla schermata "pet partito" (casa senza pet, con "Fai ammenda"). Il pet e' GIA' stato
+  // spostato in state.petPartito da pet.partePet (chiamata dentro valutaValigiaNuovoGiorno prima
+  // di generare l'evento), quindi qui leggiamo state.petPartito per nome/razza/battuta.
+  function mostraAddio(state) {
+    fermaIdle();
+    puliziaEffetto();
+    currentState = state;
+    var pet = state.petPartito || state.pet; // fallback difensivo
+    if (!pet) { mostraPetPartito(state); return; }
+
+    var flavor = ADDIO_FLAVOR[pet.razza] || ADDIO_FLAVOR.robot;
+
+    var app = getApp();
+    app.innerHTML = '';
+
+    var wrap = el('div', 'petq-screen petq-addio');
+    wrap.style.background = flavor.tinta;
+    wrap.appendChild(el('h1', 'petq-title', flavor.titolo));
+
+    var cart = document.createElement('canvas');
+    cart.width = ROOM_W;
+    cart.height = ROOM_H;
+    cart.className = 'petq-cartolina';
+    wrap.appendChild(cart);
+    disegnaScenaAddio(cart, pet, flavor);
+
+    wrap.appendChild(el('div', 'petq-hint', flavor.mezzo));
+
+    var testoEl = el('p', 'petq-esito-testo', PETQ.dialog.say(pet, 'addio', state));
+    wrap.appendChild(testoEl);
+
+    var btn = el('button', 'petq-btn petq-btn-primario', 'Continua');
+    btn.addEventListener('click', function () { mostraPetPartito(currentState); });
+    wrap.appendChild(btn);
+
+    app.appendChild(wrap);
+    montaDebugPanel();
+  }
+
+  // Scena addio: sfondo a tinta, il pet piccolo che se ne va + il "mezzo" (navetta/drone)
+  // stilizzato sopra di lui. Volutamente semplice (mini-sprite = un blocchetto colorato col
+  // tono del mezzo), come da brief.
+  function disegnaScenaAddio(canvas, pet, flavor) {
+    var g = canvas.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = flavor.tinta;
+    g.fillRect(0, 0, ROOM_W, ROOM_H);
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.fillRect(0, 50, ROOM_W, ROOM_H - 50);
+
+    // pet piccolo, in basso al centro
+    var petLike = { razza: pet.razza, sottorazza: pet.sottorazza, parts: pet.parts, stadio: pet.stadio || 'teen', corpo: 'normale', sporco: false };
+    var pc = document.createElement('canvas');
+    pc.width = PET_PX; pc.height = PET_PX;
+    PETQ.sprites.draw(pc, petLike, { frame: 0 });
+    g.drawImage(pc, Math.round((ROOM_W - PET_PX) / 2), 50 - PET_PX + 2);
+
+    // mezzo (navetta alieno / drone robot): blocchetto stilizzato in alto, col tono del mezzo,
+    // e un raggio di luce che scende verso il pet.
+    g.fillStyle = flavor.mezzoTinta;
+    g.fillRect(ROOM_W / 2 - 12, 6, 24, 8);
+    g.fillRect(ROOM_W / 2 - 6, 4, 12, 3);
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.beginPath();
+    g.moveTo(ROOM_W / 2 - 8, 14);
+    g.lineTo(ROOM_W / 2 + 8, 14);
+    g.lineTo(ROOM_W / 2 + 14, 46);
+    g.lineTo(ROOM_W / 2 - 14, 46);
+    g.closePath();
+    g.fill();
+  }
+
+  // Schermata "pet partito" (Blocco 2, recupero minimo): la casa senza pet. Mostra il nome del
+  // pet partito + un bottone "Fai ammenda" (costo 50 monete) che lo riporta a casa. Il PIANETA
+  // visitabile e la LETTERA sono un batch successivo: qui basta questo perche' il gioco non
+  // resti in stato rotto. Overlay pieno (app.innerHTML) come mostraAddio/mostraEvoluzione.
+  function mostraPetPartito(state) {
+    fermaIdle();
+    puliziaEffetto();
+    currentState = state;
+    var pet = state.petPartito;
+    if (!pet) {
+      // nessun pet partito e nessun pet in casa: stato incoerente, torna all'intro.
+      if (state.pet) { mostraCasa(state); return; }
+      mostraIntro();
+      return;
+    }
+
+    var app = getApp();
+    app.innerHTML = '';
+
+    var wrap = el('div', 'petq-screen petq-partito');
+    wrap.id = 'petq-pet-partito';
+    wrap.appendChild(el('h1', 'petq-title', 'Casa vuota'));
+
+    var cart = document.createElement('canvas');
+    cart.width = ROOM_W;
+    cart.height = ROOM_H;
+    cart.className = 'petq-cartolina';
+    wrap.appendChild(cart);
+    disegnaCasaVuota(cart, state);
+
+    wrap.appendChild(el('p', 'petq-esito-testo',
+      (pet.nome || 'Il tuo pet') + ' se n\'è andato. La casa è silenziosa senza di lui.'));
+
+    var costo = (PETQ.pet && typeof PETQ.pet._costoAmmenda === 'number') ? PETQ.pet._costoAmmenda : 50;
+    var haMonete = (state.coins || 0) >= costo;
+
+    var info = el('p', 'petq-hint', 'Puoi fare ammenda: ' + costo + ' monete per farlo tornare (Salute e Felicità a 50). Hai ' + (state.coins || 0) + ' monete.');
+    wrap.appendChild(info);
+
+    var btn = el('button', 'petq-btn petq-btn-primario', 'Fai ammenda (' + costo + ' monete)');
+    if (!haMonete) {
+      btn.disabled = true;
+      btn.title = 'Monete insufficienti.';
+    }
+    btn.addEventListener('click', function () { eseguiAmmenda(); });
+    wrap.appendChild(btn);
+
+    app.appendChild(wrap);
+    montaDebugPanel();
+  }
+
+  // Casa vuota: la stanza salone senza il pet (accenno visivo). Riusa PETQ.rooms.draw sul salone
+  // col tema della razza del pet partito, cosi' si vede "la sua casa" ma vuota.
+  function disegnaCasaVuota(canvas, state) {
+    var g = canvas.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    var pet = state.petPartito;
+    var tema = (pet && pet.razza === 'robot') ? 'lab' : 'ship';
+    if (PETQ.rooms && PETQ.rooms.draw) {
+      PETQ.rooms.draw(canvas, tema, 'salone', { poop: 0, arredi: [] });
+    } else {
+      g.fillStyle = '#2b303c';
+      g.fillRect(0, 0, ROOM_W, ROOM_H);
+    }
+    // velo scuro per dare il senso di "vuoto/spento"
+    g.fillStyle = 'rgba(10,12,18,0.35)';
+    g.fillRect(0, 0, ROOM_W, ROOM_H);
+  }
+
+  function eseguiAmmenda() {
+    if (!currentState || !PETQ.pet || !PETQ.pet.faiAmmenda) return;
+    var res = PETQ.pet.faiAmmenda(currentState);
+    if (!res.ok) {
+      mostraToast(res.msg);
+      // aggiorna il pannello (magari le monete sono cambiate)
+      mostraPetPartito(currentState);
+      return;
+    }
+    PETQ.save.save(currentState);
+    mostraToast(res.msg);
+    // pet ripristinato: torna alla casa e mostra la battuta 'rientro'.
+    mostraCasa(currentState);
+    if (currentState.pet) mostraBalloon(PETQ.dialog.say(currentState.pet, 'rientro', currentState));
+  }
+
   // ==================== PAGINA DIARIO (PROTOTIPO-2.md punto 6 "Diario in camera") ====================
   // Overlay "a foglio" sopra la scena camera (NON un app.innerHTML pieno come mostraEsito/
   // mostraEvoluzione): "Chiudi" si limita a rimuovere il nodo, cosi' si resta esattamente sulla
@@ -3764,6 +4030,10 @@ window.PETQ = window.PETQ || {};
       // fa scattare senza dover aspettare altri render). Se scatta prende il controllo dello
       // schermo, quindi aggiornaHud/renderAzioni sotto diventano no-op sugli elementi rimossi.
       if (controllaEvoluzioneScaduta()) return;
+      // Valigia / partenza (PROTOTIPO 2, Blocco 2): il dailyLogin sopra puo' aver generato un
+      // evento valigia (ingresso in valigia / rientro / partenza). Lo consumiamo qui: se e' una
+      // partenza prende il controllo dello schermo (addio -> pet partito), quindi ritorniamo.
+      if (controllaEventoValigia()) return;
       aggiornaHud(currentState);
       renderAzioni();
       mostraToast('Nuovo giorno simulato.');
@@ -3851,6 +4121,44 @@ window.PETQ = window.PETQ || {};
       controllaEvoluzioneScaduta();
     });
     panel.appendChild(evolviBtn);
+
+    // Debug "Forza valigia" (PROTOTIPO 2, Blocco 2): entra SUBITO in fase valigia (solo se teen,
+    // non gia' in valigia/partito), senza aspettare i 2 giorni critici. Fa comparire la
+    // valigetta in scena + notifica + battuta valigia.
+    var forzaValigiaBtn = el('button', 'petq-btn petq-btn-mini', 'Forza valigia');
+    forzaValigiaBtn.addEventListener('click', function () {
+      if (!currentState || !currentState.pet || !PETQ.pet || !PETQ.pet.debugForzaValigia) return;
+      if (currentState.pet.stadio !== 'teen') {
+        mostraToast('Solo da teen: evolvi prima il pet.');
+        return;
+      }
+      if (currentState.valigia) {
+        mostraToast('È già in fase valigia.');
+        return;
+      }
+      var ok = PETQ.pet.debugForzaValigia(currentState);
+      if (!ok) { mostraToast('Impossibile forzare la valigia ora.'); return; }
+      currentState.eventoValigia = { tipo: 'valigia' };
+      PETQ.save.save(currentState);
+      controllaEventoValigia();
+    });
+    panel.appendChild(forzaValigiaBtn);
+
+    // Debug "Forza partenza" (PROTOTIPO 2, Blocco 2): fa PARTIRE il pet subito (schermata addio
+    // -> casa "pet partito"), bypassando la finestra. Utile per testare l'addio e l'ammenda.
+    var forzaPartenzaBtn = el('button', 'petq-btn petq-btn-mini', 'Forza partenza');
+    forzaPartenzaBtn.addEventListener('click', function () {
+      if (!currentState || !PETQ.pet || !PETQ.pet.debugForzaPartenza) return;
+      if (!currentState.pet) {
+        mostraToast('Nessun pet in casa (già partito?).');
+        return;
+      }
+      var ok = PETQ.pet.debugForzaPartenza(currentState);
+      if (!ok) { mostraToast('Impossibile forzare la partenza ora.'); return; }
+      PETQ.save.save(currentState);
+      mostraAddio(currentState);
+    });
+    panel.appendChild(forzaPartenzaBtn);
 
     // Debug "Ri-tira talenti" (PROTOTIPO-2.md Blocco 9): ri-estrae da capo i talenti del pet
     // rispettando lo stadio attuale (1 se baby, 2 se teen), per provare combinazioni diverse

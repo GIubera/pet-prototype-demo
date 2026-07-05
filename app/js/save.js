@@ -82,6 +82,18 @@ window.PETQ = window.PETQ || {};
     }
     if (typeof state.sonno === 'undefined') state.sonno = null;
 
+    // Migrazione Valigia / partenza (PROTOTIPO 2, Blocco 2): i salvataggi senza i nuovi campi
+    // partono a null/0 (regola del brief). valigiaTrig = contatori giorni consecutivi per i tre
+    // trigger; valigia = fase valigia attiva (null = non in valigia); petPartito = pet andato
+    // via (null = pet in casa); eventoValigia = ultimo evento per la UI (null = niente). Stessa
+    // regola duplicata in main.js migraState.
+    if (!state.valigiaTrig || typeof state.valigiaTrig !== 'object') {
+      state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    }
+    if (typeof state.valigia === 'undefined') state.valigia = null;
+    if (typeof state.petPartito === 'undefined') state.petPartito = null;
+    if (typeof state.eventoValigia === 'undefined') state.eventoValigia = null;
+
     // Migrazione orologio di gioco (fix "sonno + orologio", stessa regola duplicata in
     // main.js migraState): se manca gameMinutes, si inizializza dall'ora REALE corrente.
     if (typeof state.gameMinutes !== 'number' && window.PETQ.clock && window.PETQ.clock.inizializzaOrologio) {

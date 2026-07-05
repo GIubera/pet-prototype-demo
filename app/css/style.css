@@ -1105,3 +1105,37 @@ button {
 .petq-scheda-pagina .petq-btn-primario {
   margin-top: 12px;
 }
+
+/* ---------- Valigia / partenza (PROTOTIPO 2, Blocco 2) ---------- */
+
+/* Avviso in testa alle azioni durante la fase valigia: giallo di allarme, ultimo avvertimento */
+.petq-valigia-avviso {
+  background: #4a3a12;
+  color: #f0d84a;
+  border: 1px solid #7a6420;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Schermata addio: schermo pieno centrato, tinta impostata inline per razza (navetta/drone) */
+.petq-addio,
+.petq-partito {
+  align-items: center;
+  text-align: center;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.petq-addio .petq-cartolina,
+.petq-partito .petq-cartolina {
+  max-width: 320px;
+}
+
+.petq-addio .petq-hint,
+.petq-partito .petq-hint {
+  max-width: 340px;
+}

@@ -117,6 +117,15 @@ window.PETQ = window.PETQ || {};
     }
     if (typeof state.sonno === 'undefined') state.sonno = null;
 
+    // Migrazione Valigia / partenza (PROTOTIPO 2, Blocco 2): stessa regola duplicata in save.js
+    // migraState — i salvataggi senza i nuovi campi partono a null/0.
+    if (!state.valigiaTrig || typeof state.valigiaTrig !== 'object') {
+      state.valigiaTrig = { fel: 0, sal: 0, doppio: 0 };
+    }
+    if (typeof state.valigia === 'undefined') state.valigia = null;
+    if (typeof state.petPartito === 'undefined') state.petPartito = null;
+    if (typeof state.eventoValigia === 'undefined') state.eventoValigia = null;
+
     // Migrazione orologio di gioco (fix "sonno + orologio"): i salvataggi che non conoscono
     // ancora state.gameMinutes lo inizializzano dall'ora REALE corrente, per continuita'
     // (v. clock.js inizializzaOrologio/avanzaOrologio).
