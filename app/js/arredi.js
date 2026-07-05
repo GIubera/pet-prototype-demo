@@ -5,7 +5,7 @@ window.PETQ = window.PETQ || {};
   // Stanze disponibili (v. app/js/rooms.js _stanze): usate per la struttura piazzati e per
   // validare piazza(). Duplicato minimale qui per non dipendere da rooms.js (che e' un modulo
   // grafico, fuori dallo scope di questo file).
-  var STANZE = ['cucina', 'bagno', 'salone'];
+  var STANZE = ['cucina', 'bagno', 'salone', 'camera'];
 
   // Mappa sostituzioni: regola di design fissa citata in prosa (missioni.md/bilanciamento.md),
   // non ricavabile dalla tabella arredi.md in modo generico. Chiave = nome che arriva come
@@ -51,7 +51,7 @@ window.PETQ = window.PETQ || {};
     if (!state) return;
     if (!state.arredi || typeof state.arredi !== 'object' || Array.isArray(state.arredi) ||
         !state.arredi.posseduti || !state.arredi.piazzati) {
-      state.arredi = { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [] } };
+      state.arredi = { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [], camera: [] } };
     }
     if (!Array.isArray(state.arredi.posseduti)) state.arredi.posseduti = [];
     if (!state.arredi.piazzati || typeof state.arredi.piazzati !== 'object') {

@@ -4,11 +4,11 @@ Bozza di struttura con esempi di Claude, lista definitiva da fare in sessione de
 
 | Nome | Stanza | Razza | Rarità | Come si ottiene | Bonus |
 |---|---|---|---|---|---|
-| Lampada da terra | salone | entrambe | comune | negozio 30 monete | — |
+| Lampada da terra | camera | entrambe | comune | negozio 30 monete | — |
 | Tappeto morbido | salone | entrambe | comune | negozio 40 monete | +1 Felicità passiva |
-| Poster motivazionale | salone | entrambe | comune | drop missione | — |
+| Poster motivazionale | camera | entrambe | comune | drop missione | — |
 | Frigo nuovo | cucina | entrambe | non comune | negozio 80 monete | sconto cibo 10% |
-| Piantina strana | salone | alieno | non comune | drop missione | +1 Felicità passiva |
+| Piantina strana | camera | alieno | non comune | drop missione | +1 Felicità passiva |
 | Braccio meccanico da banco | cucina | robot | non comune | drop missione | — |
 | Vasca idromassaggio | bagno | entrambe | rara | negozio 150 monete | igiene +5 extra per lavaggio |
 | Acquario di meduse | salone | alieno | rara | drop missione rara | +2 Felicità passiva |
@@ -26,9 +26,9 @@ Bozza di struttura con esempi di Claude, lista definitiva da fare in sessione de
 | Macchinina giocattolo | salone | entrambe | rara | drop missione rara (M2 super successo) | — (solo collezione) |
 | Fascia da martial artist | salone | entrambe | comune | drop missione (M3 standard) | +1 Forza passiva |
 | Completo da martial artist | salone | entrambe | rara | drop missione rara (M3 super successo, sostituisce Fascia) | +2 Forza passiva + perk Combattimento |
-| Album da disegno | salone | entrambe | comune | drop missione (M4 standard) | +1 Intelligenza passiva |
-| Libro | salone | entrambe | rara | drop missione rara (M4 super successo, sostituisce Album) | +2 Intelligenza passiva |
-| Ombrello meccanico | salone | entrambe | non comune | drop missione (M5 fallimento) | dimezza calo Igiene nelle missioni a rischio pioggia/sporco (−10 → −5) |
+| Album da disegno | camera | entrambe | comune | drop missione (M4 standard) | +1 Intelligenza passiva |
+| Libro | camera | entrambe | rara | drop missione rara (M4 super successo, sostituisce Album) | +2 Intelligenza passiva |
+| Ombrello meccanico | bagno | entrambe | non comune | drop missione (M5 fallimento) | dimezza calo Igiene nelle missioni a rischio pioggia/sporco (−10 → −5) |
 | Scooter giocattolo | salone | entrambe | rara | drop missione rara (M5 super successo) | +1 Velocità passiva |
 | Megafono | salone | entrambe | non comune | drop missione (M6 fallimento A) | +1 Carisma passiva |
 | Statuetta tipo Oscar | salone | entrambe | rara | drop missione rara (M6 super successo) | +1 Carisma passiva |
@@ -46,8 +46,13 @@ Bozza di struttura con esempi di Claude, lista definitiva da fare in sessione de
 | Coppa Robot Wars | camera | entrambe | comune | drop missione (M10 standard) | +1 Intelligenza passiva |
 | Mecha-Bot | camera | entrambe | rara | drop missione rara (M10 super Intelligenza) | +2 Forza passiva |
 | Telecomando Pirata | salone | entrambe | rara | drop missione rara (M10 super Maleducato) | +1 Velocità passiva + perk Sabotatore |
+| Cuccia | camera | entrambe | comune | drop missione (M11 standard) | +1 Felicità passiva |
+| Distributore di croccantini | cucina | entrambe | non comune | drop missione (M11 fallimento Maleducato) | +1 Felicità passiva |
+| Gattino Robot | camera | entrambe | rara | drop missione rara (M11 super successo) | +1 Carisma passiva |
+| Manuale di Botanica | camera | entrambe | comune | drop missione (M12 fallimento) | +1 Intelligenza passiva |
+| Pianta Esotica | ovunque | entrambe | rara | drop missione rara (M12 super successo) | +2 a una stat RPG casuale ogni giorno (passivo, ri-estratta ogni giorno, non si accumula) |
 
-Tutti provvisoriamente in "salone" (nessuna stanza specifica discussa in sessione) — da rivedere quando si definiscono gli slot per stanza.
+Stanza assegnata per tema (PROTOTIPO 2, Blocco 7 — collectables in tutte le stanze): cibo/elettrodomestici → cucina (Frigo nuovo, Braccio meccanico da banco, Distributore di croccantini), accessori bagno → bagno (Vasca idromassaggio, Ombrello meccanico), relax/notte/lettura/cuccioli → camera (Lampada da terra, Poster motivazionale, Piantina strana, Album da disegno, Libro, Coppa Robot Wars, Mecha-Bot, Cuccia, Gattino Robot, Manuale di Botanica), trofei/giochi/armi/sport → salone (il resto). La Pianta Esotica (M12 super) è l'unico arredo mettibile in QUALSIASI stanza. Ogni stanza ha 3 slot con supporti dedicati (v. rooms.js _slotSpots/_slotTipi). Da rifinire in sessione design se servono ribilanciamenti.
 
 Da decidere in sessione design:
 - Quanti slot arredo per stanza nel prototipo (proposta: 3)

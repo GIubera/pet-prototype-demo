@@ -49,7 +49,12 @@ window.PETQ = window.PETQ || {};
 
     if (!state.arredi || typeof state.arredi !== 'object' || Array.isArray(state.arredi) ||
         !state.arredi.posseduti || !state.arredi.piazzati) {
-      state.arredi = { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [] } };
+      state.arredi = { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [], camera: [] } };
+    }
+    // PROTOTIPO 2, Blocco 7: gli arredi vanno in TUTTE le stanze -> backfill del contenitore
+    // 'camera' sui salvataggi vecchi che avevano solo cucina/bagno/salone.
+    if (state.arredi.piazzati && !Array.isArray(state.arredi.piazzati.camera)) {
+      state.arredi.piazzati.camera = [];
     }
     if (typeof state.ferite !== 'number') state.ferite = 0;
     if (typeof state.cureOggi !== 'number') state.cureOggi = 0;

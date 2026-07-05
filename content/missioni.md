@@ -1,4 +1,4 @@
-# Missioni — prototipo (10 schede + tutorial)
+# Missioni — prototipo (12 schede + tutorial)
 
 Chi compila: il fondatore definisce le schede (requisiti, durata, reward, condizioni); il socio scrive i testi degli esiti (qui in versione neutra, poi le varianti per personalità). Ogni scheda ha anche una riga "Scena" per chi disegnerà gli sprite di ogni esito.
 
@@ -301,6 +301,61 @@ Scena: pet trionfante accanto a un robot grosso e minaccioso, rottami intorno
 
 Priorità super M10: Sabotaggio (Maleducato) prima di Mecha-Bot (generico Int 3+). Come per M7, il super batte sempre il fallimento: un Gentile con Int 3+ va in Mecha-Bot, non nel fallimento "fa amicizia".
 
+## Missione 11: Rifugio Creature Smarrite
+- Luogo: 📍 Rifugio Creature Smarrite
+- Razza: entrambe
+- Categoria: Sociale
+- Stat coinvolta: Carisma
+- Tag: natura
+- Durata: 2h
+- Costo: gratis (volontariato)
+- Dati: durata=2h ; costo=0 ; categoria=sociale ; stat=carisma ; tag=natura
+
+**Standard** — +1 Carisma, +8 monete, Cuccia (arredo camera, +1 Felicità passiva)
+Dati: reward= carisma+1, monete+8, arredo:Cuccia
+Testo: "Il rifugio è un tripudio di guaiti, cinguettii metallici e versi alieni indefinibili. Passi il pomeriggio a coccolare cuccioli robo e creaturine spaesate, a pulire gabbiette e a convincere un paio di famiglie che sì, quel batuffolo a tre occhi è adorabile. Il proprietario, commosso, ti ringrazia con due spicci e una cuccia avanzata 'per quando ne adotterai uno anche tu'."
+Scena: pet accovacciato che accarezza un cucciolo robo/alieno, gabbiette sullo sfondo, altri cuccioli intorno — mood caldo e tenero
+
+**Fallimento** (condizione: Maleducato) — niente Carisma, morso (Ferite +10), Biscotto (cibo Carisma+1), Distributore di croccantini (arredo cucina)
+Dati: priorita=1 ; cond= maleducato ; reward= ferite+10, cibo:Biscotto, arredo:Distributore di croccantini
+Testo: "Basta un pomeriggio per trasformare un rifugio tranquillo in una zona di guerra: rispondi male ai clienti, tratti i cuccioli come scocciature, e uno di loro — comprensibilmente — ti pianta i denti in un polpaccio. Te ne vai zoppicando, ma non a mani vuote: nella confusione arraffi una scatola di dolciumi e ti 'prendi in prestito' pure il distributore di croccantini."
+Scena: pet scocciato che si allontana con un cucciolo aggrappato alla gamba e una scatola sottobraccio — mood comico-caotico
+
+**Fallimento** (condizione: Carisma ≤1) — niente Carisma, morso (Ferite +10), +5 monete, Biscotto (cibo Carisma+1)
+Dati: priorita=2 ; cond= carisma<=1 ; reward= ferite+10, monete+5, cibo:Biscotto
+Testo: "Ce la metti tutta, ma con i cuccioli proprio non scatta la scintilla: ti annusano, ti girano intorno e decidono che non fai per loro. Uno, per sicurezza, ti dà pure un morsetto. Il proprietario ti liquida con due monete e una manciata di biscotti 'per il disturbo'. Sarà per la prossima."
+Scena: pet mogio con un cerotto, un cucciolo che gli volta le spalle — mood dispiaciuto
+
+**Super successo** (condizione: Carisma 3+, o auto col talento Amante della Natura via tag natura) — +2 Carisma, +18 monete, Gattino Robot (arredo camera, +1 Carisma passivo)
+Dati: cond= carisma>=3 ; reward= carisma+2, monete+18, arredo:Gattino Robot
+Testo: "Nel giro di un'ora sei diventato il preferito del rifugio: i cuccioli ti seguono in fila, i clienti si fidano solo di te, e trovi casa a metà degli ospiti prima di sera. Il proprietario ti riempie di monete e ti mette tra le braccia il pezzo pregiato del rifugio: un gattino robot che ha scelto TE e non intende più mollarti."
+Scena: [DEDICATA] pet raggiante circondato da cuccioli festanti, un gattino robot in braccio che fa le fusa (scintille/cuoricini) — mood trionfale e adorabile
+
+## Missione 12: Serra del Giardiniere Matto
+- Luogo: 📍 Serra del Giardiniere Matto
+- Razza: entrambe
+- Categoria: Studio
+- Stat coinvolta: Intelligenza
+- Tag: natura
+- Durata: 3h
+- Costo: gratis (volontariato)
+- Dati: durata=3h ; costo=0 ; categoria=studio ; stat=int ; tag=natura
+
+**Standard** — +1 Int, +8 monete
+Dati: reward= int+1, monete+8
+Testo: "La serra è una giungla di piante aliene che sibilano, si allungano e ti fissano con baccelli che sembrano occhi. Il vecchio giardiniere, mezzo matto e coperto di foglie, ti insegna quali annaffiare, quali NON toccare e quale canticchiare per farla fiorire. Alla fine hai le dita verdi e la testa piena di nozioni botaniche assurde ma utili."
+Scena: pet con annaffiatoio tra piante aliene bizzarre e altissime, il giardiniere eccentrico che indica una pianta — mood curioso, luce verde-serra
+
+**Fallimento** (condizione: Intelligenza ≤1) — niente Int, Manuale di Botanica (arredo camera, +1 Int passivo)
+Dati: cond= int<=1 ; reward= arredo:Manuale di Botanica
+Testo: "Le piante aliene hanno regole precise, e tu ne sbagli praticamente tutte: annaffi quella che odia l'acqua, poti quella che andava lasciata stare, e finisci avvolto dai tentacoli di una che 'di solito è docile'. Il giardiniere ti libera ridacchiando e ti regala un manuale: 'leggilo, la prossima volta, PRIMA di entrare'."
+Scena: pet impigliato nei tentacoli di una pianta, il giardiniere che ride e porge un libro — mood comico
+
+**Super successo** (condizione: Intelligenza 3+, o auto col talento Amante della Natura via tag natura) — +2 Int, +15 monete, Pianta Esotica (arredo mettibile in ogni stanza, +2 a una stat RPG casuale ogni giorno)
+Dati: cond= int>=3 ; reward= int+2, monete+15, arredo:Pianta Esotica
+Testo: "Non solo impari le regole della serra — le riscrivi. Capisci al volo cosa vuole ogni pianta, ne fai fiorire una che il giardiniere non vedeva sbocciare da anni, e lui, con le lacrime agli occhi, ti affida il suo esemplare più prezioso: una pianta esotica dai poteri imprevedibili, che ogni giorno regala energie diverse a chi le sta vicino."
+Scena: [DEDICATA] pet che regge con orgoglio una pianta esotica luminosa e pulsante di colori, il giardiniere commosso sullo sfondo — mood magico
+
 ---
 
 ## Backlog — concetti sviluppati ma non scelti (da riprendere in una sessione futura)
@@ -319,8 +374,8 @@ Priorità super M10: Sabotaggio (Maleducato) prima di Mecha-Bot (generico Int 3+
 
 ---
 
-## Linee guida di progetto (dal GDD, verificate su queste 10 schede)
-- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8), Carisma (M2, M6), Forza (M3, M5, M7), Intelligenza (M4, M9, M10) ✓
+## Linee guida di progetto (dal GDD, verificate su queste 12 schede)
+- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8), Carisma (M2, M6, M11), Forza (M3, M5, M7), Intelligenza (M4, M9, M10, M12) ✓
 - Durate tra 1 e 6 ore reali, con una corta ~1h (M1) ✓
 - Reward misti: monete, cibo, arredi, XP stat — mai solo monete ✓
 - Rischio igiene (M5) e salute (M3, M7) per far girare la loop di cura ✓

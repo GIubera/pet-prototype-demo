@@ -473,7 +473,7 @@ window.PETQ = window.PETQ || {};
       poop: 0,
       lastSeen: Date.now(),
       lastLoginDay: oggiStr(),
-      arredi: { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [] } },
+      arredi: { posseduti: [], piazzati: { cucina: [], bagno: [], salone: [], camera: [] } },
       parole: [],
       missione: null,
       missioniFatte: {},
@@ -2319,8 +2319,8 @@ window.PETQ = window.PETQ || {};
     var wrap = el('div', 'petq-collezione');
     var arr = currentState.arredi || {};
     var posseduti = arr.posseduti || [];
-    var piazzati = arr.piazzati || { cucina: [], bagno: [], salone: [] };
-    var stanze = ['cucina', 'bagno', 'salone'];
+    var piazzati = arr.piazzati || { cucina: [], bagno: [], salone: [], camera: [] };
+    var stanze = ['cucina', 'bagno', 'salone', 'camera'];
     var slotMax = (PETQ.arredi && PETQ.arredi.slotPerStanza) ? PETQ.arredi.slotPerStanza() : 3;
 
     var slotInfo = [];
@@ -2360,7 +2360,12 @@ window.PETQ = window.PETQ || {};
 
   function rigaArredo(voce, piazzatoIn, conteggi) {
     var info = trovaArredoInfo(voce.nome);
-    var stanzaDest = (info && ['cucina', 'bagno', 'salone'].indexOf(info.stanza) !== -1) ? info.stanza : 'salone';
+    // PROTOTIPO 2, Blocco 7: la stanza destinazione e' quella dell'arredo (arredi.md colonna
+    // "stanza") tra tutte e 4; fallback 'salone' se manca/ignota (es. arredi programmatici) o se
+    // "ovunque" (arredi.md, es. Pianta Esotica): nel prototipo il pannello Collezione vive solo
+    // nel salone, quindi gli arredi "ovunque" si piazzano li' (la scelta libera della stanza e'
+    // materia della TAB SHOP, batch successivo).
+    var stanzaDest = (info && ['cucina', 'bagno', 'salone', 'camera'].indexOf(info.stanza) !== -1) ? info.stanza : 'salone';
 
     var riga = el('div', 'petq-arredo-riga');
     var testi = el('div', 'petq-arredo-info');

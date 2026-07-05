@@ -164,6 +164,8 @@ window.PETQ = window.PETQ || {};
     R(g, 82, 33, 20, 9, "#4a5762");
     R(g, 86, 35, 10, 4, "#252f38");
     R(g, 82, 32, 20, 1, L.metalloChiaro);
+    // mensolina collezione sopra i fornelli (slot cucina[0], v. SLOT_SPOTS.cucina [84,2])
+    mensolina(g, 84, 16, "lab");
   }
 
   function labBagno(g) {
@@ -302,6 +304,8 @@ window.PETQ = window.PETQ || {};
     O(g, 80, 18, 8, 6, L.out, L.ambra);
     // scrivania del diario, tra letto e comodino (GDD "Diario in camera")
     labScrivania(g);
+    // mensolina collezione a sinistra, sopra la testiera (slot camera[0], v. SLOT_SPOTS.camera [28,4])
+    mensolina(g, 28, 18, "lab");
     // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
   }
 
@@ -352,6 +356,8 @@ window.PETQ = window.PETQ || {};
     ledPanel(g, 82, 18);
     // scrivania del diario, tra letto e comodino (GDD "Diario in camera")
     shipScrivania(g);
+    // mensolina collezione a sinistra, sopra la testiera (slot camera[0], v. SLOT_SPOTS.camera [28,4])
+    mensolina(g, 28, 18, "ship");
     // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
   }
 
@@ -384,6 +390,22 @@ window.PETQ = window.PETQ || {};
       R(g, 35, 17, 3, 2, "#f0b84a");
       R(g, 44, 6, 2, 2, S.metalloChiaro); // ganci
       R(g, 49, 6, 2, 2, S.metalloChiaro);
+    }
+  }
+
+  // Mensolina generica a muro (PROTOTIPO 2, Blocco 7): ripiano sottile su cui appoggia lo slot
+  // "mensola" di cucina/camera. Il piano d'appoggio sta al bordo BASSO del footprint 14x14 dello
+  // slot (l'arredo viene disegnato con top-left = coordinata slot, alto ~14px): plane = slotY+14.
+  // Stile per tema come mensolaSalone (montanti metallici lab, glow fluttuante ship).
+  function mensolina(g, x, planeY, tema) {
+    if (tema === "lab") {
+      R(g, x, planeY - 2, 14, 2, L.metalloChiaro);
+      R(g, x, planeY, 14, 1, L.out);
+      R(g, x, planeY - 6, 1, 6, L.metalloScuro); // montanti
+      R(g, x + 13, planeY - 6, 1, 6, L.metalloScuro);
+    } else {
+      R(g, x, planeY - 2, 14, 2, S.metalloChiaro);
+      R(g, x, planeY, 14, 1, S.glow);
     }
   }
 
@@ -425,6 +447,8 @@ window.PETQ = window.PETQ || {};
     R(g, 82, 33, 20, 9, S.sportello);
     R(g, 86, 35, 10, 4, S.out);
     R(g, 82, 32, 20, 1, S.metalloChiaro);
+    // mensolina collezione sopra i fornelli (slot cucina[0], v. SLOT_SPOTS.cucina [84,2])
+    mensolina(g, 84, 16, "ship");
   }
 
   function shipBagno(g) {
@@ -914,21 +938,30 @@ window.PETQ = window.PETQ || {};
   assertMappa();
 
   // ===== Arredi piazzati nelle stanze (112x64): 3 slot per stanza, footprint max ~14x14 =====
-  // Salone: supporti dedicati (GDD -> Casa) — mensola a muro (oggetti appoggiati, piano a y=14),
-  // zona ganci/quadri accanto, pavimento a sinistra del letto. Cucina/bagno come prima.
+  // PROTOTIPO 2, Blocco 7 (collectables in TUTTE le stanze): ogni stanza ha 3 slot con supporti
+  // coerenti col mobilio esistente e i due temi lab/ship, scelti per NON collidere con i mobili
+  // chiave (frigo/fornelli, vasca/lavandino/infermeria, letto/comodino/scrivania), con le hotzone
+  // (vasca x0-50 y20-64, frigo, letto, scrivania) ne' col pet (base al centro x48-64/y44-60, che
+  // con l'idle "corre per casa" arriva fino a x32-80). V. _assertSlots per la verifica.
+  // - Salone: supporti dedicati storici (mensola a muro con oggetti appoggiati piano y=14, zona
+  //   ganci/quadri, pavimento a sinistra) — invariato.
+  // - Cucina: mensola sopra i fornelli (parete libera y<16) + pavimento angolo sinistro (sotto il
+  //   frigo, y>44) + pavimento far-right (fuori dalla banda del pet).
+  // - Bagno: 2 muro (sopra la fascia, fuori dalla hotzone vasca) + 1 pavimento far-right sotto
+  //   il lavandino (l'unico angolo di pavimento fuori da vasca e pet).
+  // - Camera: mensolina a muro a sinistra (sopra la testiera) + muro centro + pavimento far-right.
   var SLOT_SPOTS = {
-    cucina: [[24, 48], [70, 48], [96, 47]],
-    bagno:  [[24, 48], [66, 46], [32, 8]],
+    cucina: [[84, 2], [2, 48], [96, 48]],
+    bagno:  [[32, 4], [64, 4], [92, 49]],
     salone: [[26, 0], [40, 4], [2, 46]],
-    // camera: solo 2 slot (pavimento + muro), il letto e' gia' il pezzo forte della stanza
-    camera: [[96, 46], [58, 4]]
+    camera: [[28, 4], [58, 4], [96, 46]]
   };
   // tipo di supporto di ogni slot, nello stesso ordine di SLOT_SPOTS
   var SLOT_TIPI = {
-    cucina: ["pavimento", "pavimento", "pavimento"],
-    bagno:  ["pavimento", "pavimento", "pavimento"],
+    cucina: ["mensola", "pavimento", "pavimento"],
+    bagno:  ["muro", "muro", "pavimento"],
     salone: ["mensola", "muro", "pavimento"],
-    camera: ["pavimento", "muro"]
+    camera: ["mensola", "muro", "pavimento"]
   };
 
   // supporto naturale di ogni arredo (chiavi normalizzate); tutto il resto -> pavimento
@@ -1220,7 +1253,42 @@ window.PETQ = window.PETQ || {};
     return nomi;
   }
 
-  // assert di sviluppo: slot dentro il canvas stanza, senza sovrapposizioni tra loro né col letto
+  // assert di sviluppo: slot dentro il canvas stanza, senza sovrapposizioni tra loro né coi
+  // mobili chiave / hotzone / pet della stanza (PROTOTIPO 2, Blocco 7).
+  // NO_GO[stanza] = rettangoli proibiti per gli slot arredo. Coordinate allineate ai mobili
+  // disegnati (peggiore tra lab/ship) e alle hotzone tap gia' esistenti. Il "pet" e' la banda
+  // in cui il pet si muove: base al centro (x48-64) + escursione idle "corre per casa" (+/-16 ->
+  // x32-80), altezza a pavimento (y44-60). La vasca usa la sua hotzone drag (ui.js HOTZONE_VASCA).
+  var PET_BAND = { x: 32, y: 44, w: 48, h: 16, _n: "pet" };
+  var NO_GO = {
+    cucina: [
+      { x: 6, y: 10, w: 16, h: 34, _n: "frigo" },          // frigo/capsula (hotzone _frigoZona)
+      { x: 26, y: 32, w: 26, h: 12, _n: "bancone" },
+      { x: 78, y: 16, w: 28, h: 28, _n: "fornelli/forno" },
+      PET_BAND
+    ],
+    bagno: [
+      { x: 0, y: 20, w: 50, h: 44, _n: "vasca (hotzone)" }, // ui.js HOTZONE_VASCA
+      { x: 48, y: 10, w: 16, h: 34, _n: "doccia ship" },
+      { x: 80, y: 8, w: 24, h: 40, _n: "specchio/lavandino" },
+      { x: 104, y: 24, w: 8, h: 20, _n: "infermeria ship" },
+      { x: 6, y: 10, w: 12, h: 10, _n: "infermeria lab" },
+      PET_BAND
+    ],
+    salone: [
+      { x: 4, y: 22, w: 42, h: 18, _n: "divano/seduta" },
+      { x: 54, y: 6, w: 54, h: 24, _n: "schermo/oblo" }, // x54: bordo utile, lo slot muro [40,4] tiene l'oggetto a x<=52
+      PET_BAND
+    ],
+    camera: [
+      LETTO_LAB_CAMERA, LETTO_SHIP_CAMERA, SCRIVANIA_CAMERA,
+      { x: 78, y: 18, w: 16, h: 26, _n: "comodino" },
+      { x: 6, y: 6, w: 20, h: 14, _n: "finestra/oblo" }
+      // niente PET_BAND in camera: il letto occupa il centro, il pet dorme/sta ai lati; gli slot
+      // [28,4]/[58,4] sono a muro sopra il letto e [96,46] e' l'angolo pavimento far-right libero.
+    ]
+  };
+
   function assertSlots() {
     function overlap(a, b) {
       return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -1228,6 +1296,7 @@ window.PETQ = window.PETQ || {};
     for (var stanza in SLOT_SPOTS) {
       if (!Object.prototype.hasOwnProperty.call(SLOT_SPOTS, stanza)) continue;
       var boxes = SLOT_SPOTS[stanza].map(function (s) { return { x: s[0], y: s[1], w: 14, h: 14 }; });
+      var vietati = NO_GO[stanza] || [];
       for (var i = 0; i < boxes.length; i++) {
         if (boxes[i].x < 0 || boxes[i].y < 0 || boxes[i].x + boxes[i].w > W || boxes[i].y + boxes[i].h > H) {
           console.error("PETQ.rooms: slot " + stanza + "[" + i + "] esce dal canvas " + W + "x" + H);
@@ -1237,11 +1306,10 @@ window.PETQ = window.PETQ || {};
             console.error("PETQ.rooms: slot sovrapposti " + stanza + "[" + i + "]/[" + j + "]");
           }
         }
-        if (stanza === "camera" && (overlap(boxes[i], LETTO_LAB_CAMERA) || overlap(boxes[i], LETTO_SHIP_CAMERA))) {
-          console.error("PETQ.rooms: slot camera[" + i + "] si sovrappone al letto");
-        }
-        if (stanza === "camera" && overlap(boxes[i], SCRIVANIA_CAMERA)) {
-          console.error("PETQ.rooms: slot camera[" + i + "] si sovrappone alla scrivania");
+        for (var v = 0; v < vietati.length; v++) {
+          if (overlap(boxes[i], vietati[v])) {
+            console.error("PETQ.rooms: slot " + stanza + "[" + i + "] si sovrappone a " + (vietati[v]._n || "zona vietata"));
+          }
         }
       }
       if ((SLOT_TIPI[stanza] || []).length !== SLOT_SPOTS[stanza].length) {

@@ -102,7 +102,7 @@
   <h2>Mappa della città (tab Missioni) — attivi illuminati con pin, inCorso pulsante</h2>
   <div class="grid" id="grid-mappa"></div>
 
-  <h2>Arredi nelle stanze — 3 piazzati per stanza (slot pavimento/muro) + il topo allenatore</h2>
+  <h2>Arredi nelle stanze — 3 slot per stanza con supporti (mensola/muro/pavimento) in cucina/bagno/salone/camera + il topo allenatore</h2>
   <div class="grid" id="grid-arredi"></div>
 
   <script src="js/sprites.js"></script>
@@ -364,8 +364,12 @@
     var arrediDemo = [
       { tema: "lab", stanza: "salone", arredi: ["Coppa Arcade", "Poster motivazionale", "Topo allenatore"] },
       { tema: "ship", stanza: "salone", arredi: ["Statuetta tipo Oscar", "Katane a farfalla", "Topo allenatore"] },
-      { tema: "lab", stanza: "cucina", arredi: ["Tappeto morbido", "Frigo nuovo", "Arredo Sconosciuto (fallback)"] },
-      { tema: "ship", stanza: "bagno", arredi: ["Vasca idromassaggio", "Pesi", "Pallone da calcio"] }
+      { tema: "lab", stanza: "cucina", arredi: ["Coppa Arcade", "Frigo nuovo", "Tappeto morbido"] },
+      { tema: "ship", stanza: "cucina", arredi: ["Statuetta tipo Oscar", "Frigo nuovo", "Arredo Sconosciuto (fallback)"] },
+      { tema: "lab", stanza: "bagno", arredi: ["Ombrello meccanico", "Poster motivazionale", "Vasca idromassaggio"] },
+      { tema: "ship", stanza: "bagno", arredi: ["Ombrello meccanico", "Poster motivazionale", "Vasca idromassaggio"] },
+      { tema: "lab", stanza: "camera", arredi: ["Libro", "Poster motivazionale", "Lampada da terra"] },
+      { tema: "ship", stanza: "camera", arredi: ["Libro", "Poster motivazionale", "Piantina strana"] }
     ];
     arrediDemo.forEach(function (d) {
       var scale = 4;
