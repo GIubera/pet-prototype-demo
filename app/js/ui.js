@@ -51,9 +51,14 @@ window.PETQ = window.PETQ || {};
     y = Math.min(Math.max(y, r.y), Math.max(r.y, r.y + r.h - PET_PX));
     return { x: x, y: y };
   }
-  // posizione del pet mentre dorme CROLLATO (sul pavimento, al centro come l'idle normale)
+  // posizione del pet mentre dorme CROLLATO (sul pavimento della camera). Spostato a destra
+  // del centro (fix leggibilita' posa sdraiata): il centro stanza cade dentro il rettangolo
+  // del letto (v. LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA in rooms.js, entrambi x:14-~54/56), quindi
+  // il crollo si sovrapponeva visivamente al letto invece di leggersi come "sul pavimento,
+  // NON nel letto" (la punizione visiva voluta dal GDD "Energia e sonno"). Nello spazio libero
+  // a destra del letto (~x:60-108) il crollo resta chiaramente separato dal mobile.
   function sleepFloorPos() {
-    return { x: Math.round((ROOM_W - PET_PX) / 2), y: ROOM_H - PET_PX - 4 };
+    return { x: ROOM_W - PET_PX - 8, y: ROOM_H - PET_PX - 4 };
   }
 
   // mappa allenamento: prop -> stat (da GDD "Direzione interazione")
@@ -705,10 +710,16 @@ window.PETQ = window.PETQ || {};
     disegnaSlotArredi(g, state);
 
     var inMissione = !!state.missione;
+    // Dorme = il pet "vive" in camera per tutta la durata del sonno (riposino, notturno o
+    // crollo): nelle altre stanze non va MAI disegnato (GDD "Energia e sonno" -> bug fix 5
+    // lug 2026, prima si "trasferiva" sul pavimento di ogni stanza). Qui sotto usiamo
+    // dormeAltrove per saltare il disegno del pet e mostrare l'hint al suo posto.
+    var dormeAltrove = !!state.sonno && currentStanza !== 'camera';
 
-    if (inMissione) {
-      // il pet non è in casa: stanza vuota, niente hit-test sul pet
+    if (inMissione || dormeAltrove) {
+      // il pet non è visibile in questa stanza: niente hit-test sul pet
       lastPetRect = null;
+      if (dormeAltrove) disegnaHintDorme(g, state);
     } else if (!petDragging) {
       var pos = posizionePet();
 
@@ -717,10 +728,12 @@ window.PETQ = window.PETQ || {};
       petCanvas.height = PET_PX;
 
       if (state.sonno) {
-        // Dorme: sprite SDRAIATO orizzontale (non in piedi) + Zzz, sia sul letto sia
-        // crollato a terra (GDD "Energia e sonno" -> Zzz animati). drawSdraiato include gia'
-        // l'overlay drawSonno (palpebre+Zzz) al suo interno, niente overlaySonno separato.
-        PETQ.sprites.drawSdraiato(petCanvas, petLikeDaState(state), { frame: idleFrame });
+        // Dorme (e siamo in camera, v. dormeAltrove sopra): sprite SDRAIATO orizzontale
+        // (non in piedi) + palpebre chiuse, sia sul letto sia crollato a terra (GDD "Energia
+        // e sonno"). zzz:false = gli Zzz NON li disegna qui dentro (sul mini-canvas del pet
+        // verrebbero clippati dal bordo, v. sprites.js drawSdraiato): li ridisegniamo subito
+        // dopo su tutto il canvas stanza con disegnaZzzStanza, dove c'e' margine per contenerli.
+        PETQ.sprites.drawSdraiato(petCanvas, petLikeDaState(state), { frame: idleFrame, zzz: false });
       } else {
         PETQ.sprites.draw(petCanvas, petLikeDaState(state), { frame: idleFrame });
       }
@@ -746,12 +759,53 @@ window.PETQ = window.PETQ || {};
       }
 
       lastPetRect = { x: pos.x, y: pos.y, w: PET_PX, h: PET_PX };
+
+      // Zzz "esterni": fix del clipping noto (v. sprites.js drawSdraiato) — la "Z" piu' grande
+      // sfora oltre il bordo destro/superiore del mini-canvas PET_PX x PET_PX. Ridisegnandoli
+      // qui sul canvas stanza (112x64, molto piu' ampio) restano interi e leggibili.
+      if (state.sonno) disegnaZzzStanza(g, pos);
     }
 
     if (effetto && effetto.tipo === 'puff') disegnaPuff(g, effetto);
 
     aggiornaIndicatoreMissione(state);
     aggiornaIndicatoreAllenamento(state);
+  }
+
+  // Overlay "sta dormendo altrove": la stanza corrente (non camera) resta vuota mentre il
+  // pet dorme, con un avviso discreto invece del pet sul pavimento (GDD "Energia e sonno").
+  function disegnaHintDorme(g, state) {
+    var nome = (state.pet && state.pet.nome) || 'Il pet';
+    var testo = nome + ' sta dormendo in camera 💤';
+    g.save();
+    g.font = '6px monospace';
+    g.textBaseline = 'middle';
+    var textW = g.measureText(testo).width;
+    var padX = 5, padY = 4;
+    var boxW = Math.min(ROOM_W - 6, textW + padX * 2);
+    var boxX = Math.round((ROOM_W - boxW) / 2);
+    var boxY = Math.round(ROOM_H / 2 - 7);
+    g.fillStyle = 'rgba(13, 18, 24, 0.78)';
+    g.fillRect(boxX, boxY, boxW, 14);
+    g.fillStyle = '#dfe4ec';
+    g.textAlign = 'center';
+    g.fillText(testo, ROOM_W / 2, boxY + padY + 3, boxW - padX);
+    g.restore();
+  }
+
+  // Zzz sopra la testa del pet dormiente, ridisegnati sul canvas STANZA (112x64) invece che
+  // sul mini-canvas del pet (32x32): fix del bug noto di clipping (v. sprites.js drawSdraiato,
+  // dove la "Z" piu' in alto/a destra usciva dal bordo del canvas del pet, che e' PET_PX x
+  // PET_PX e non ha margine per y negative o x oltre i 16 "pixel logici"). Disegniamo
+  // direttamente sul contesto reale della stanza (molto piu' ampio, niente clip), traslato
+  // all'angolo dello sprite e con la stessa scala PET_PX/16 che userebbe il mini-canvas
+  // (drawZzz accetta la scala esplicita apposta per questo, v. sprites.js).
+  function disegnaZzzStanza(g, pos) {
+    if (!PETQ.sprites || !PETQ.sprites.drawZzz) return;
+    g.save();
+    g.translate(pos.x, pos.y);
+    PETQ.sprites.drawZzz(g, idleFrame, PET_PX / PET_SIZE);
+    g.restore();
   }
 
   // placeholder arredi piazzati: puntino luminoso sugli slot occupati della stanza corrente.
@@ -1536,6 +1590,10 @@ window.PETQ = window.PETQ || {};
 
   function renderAzioniCucina(container) {
     var nome = currentState.pet.nome || 'il pet';
+    if (currentState.sonno) {
+      container.appendChild(el('p', 'petq-hint', nome + ' sta dormendo in camera: la pappa aspetta il suo risveglio.'));
+      return;
+    }
     var hintCucina = currentState.missione
       ? nome + ' è in missione: la pappa aspetta il suo ritorno.'
       : 'Tocca il frigo per vedere cosa avete in casa.';
@@ -1661,6 +1719,10 @@ window.PETQ = window.PETQ || {};
 
   function renderAzioniBagno(container) {
     var nome = currentState.pet.nome || 'il pet';
+    if (currentState.sonno) {
+      container.appendChild(el('p', 'petq-hint', nome + ' sta dormendo in camera: niente bagnetto finché non si sveglia.'));
+      return;
+    }
     if (currentState.missione) {
       container.appendChild(el('p', 'petq-hint', nome + ' è in missione: niente bagnetto finché non torna.'));
     } else if (currentState.allenamento) {
@@ -1755,6 +1817,10 @@ window.PETQ = window.PETQ || {};
   function renderAzioniSalone(container) {
     var oggi = oggiStr();
     var nome = currentState.pet.nome || 'il pet';
+    if (currentState.sonno) {
+      container.appendChild(el('p', 'petq-hint', nome + ' sta dormendo in camera: niente giochi finché non si sveglia.'));
+      return;
+    }
     var inMissione = !!currentState.missione;
     var inAllenamento = !!currentState.allenamento;
 

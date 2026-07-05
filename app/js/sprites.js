@@ -286,13 +286,26 @@ window.PETQ = window.PETQ || {};
     }
   }
 
-  // Resa "sdraiato" (dorme, GDD "Energia e sonno" -> Zzz animati): ruota lo sprite esistente
-  // di 90 gradi cosi' il pet appare disteso in orizzontale invece che in piedi, senza bisogno
-  // di ridisegnare ogni creatura in una posa dedicata. Il canvas resta quadrato (stesso
-  // PET_PX x PET_PX usato per lo sprite in piedi, v. ui.js PET_PX) cosi' il chiamante non deve
-  // toccare hit-test/posizionamento: la rotazione avviene internamente attorno al centro.
-  // "lato": 1 = testa a sinistra (default, per il letto), -1 = testa a destra (specchiato,
-  // utile per varianti di posa sul pavimento).
+  // Resa "sdraiato" (dorme, GDD "Energia e sonno" -> "posa ben leggibile da dormiente,
+  // sdraiato, testa verso il cuscino"): ruota lo sprite esistente di 90 gradi cosi' il pet
+  // appare disteso in orizzontale invece che in piedi, senza bisogno di ridisegnare ogni
+  // creatura in una posa dedicata. Il canvas resta quadrato (stesso PET_PX x PET_PX usato per
+  // lo sprite in piedi, v. ui.js PET_PX) cosi' il chiamante non deve toccare hit-test/
+  // posizionamento: la rotazione avviene internamente attorno al centro.
+  // "lato": 1 = testa a sinistra / verso il cuscino (default, per il letto), -1 = testa a
+  // destra (specchiato, variante per il crollo sul pavimento).
+  //
+  // Nota di design: gli sprite di questo gioco sono tutti tozzi/compatti (16x16, "umanoidi
+  // rotondi") - una rotazione pura di 90 gradi da sola non basta a leggersi come "disteso",
+  // perche' silhouette gia' quasi quadrate restano quasi quadrate anche ruotate (verificato:
+  // baby e teen ruotati restano un blocco compatto senza un lato chiaramente "testa"). Per
+  // questo aggiungiamo due indizi extra, disegnati insieme alla rotazione invece di ridisegnare
+  // ogni creatura: un CUSCINO (rettangolo chiaro dietro la testa, dal lato "lato") e una
+  // COPERTA (fascia semi-trasparente sulla meta' del corpo lontana dalla testa) - questi due
+  // elementi ancorano visivamente "dove sta la testa" e "il pet e' sotto qualcosa", cosa che la
+  // sola rotazione non comunicava.
+  var CUSCINO_COLOR = "#eef1f6";
+  var COPERTA_COLOR = "rgba(80, 110, 150, 0.55)";
   function drawSdraiato(canvas, petLike, opts) {
     if (!canvas || !petLike) return;
     opts = opts || {};
@@ -304,11 +317,20 @@ window.PETQ = window.PETQ || {};
     var scale = canvas.width / SIZE;
     var cx = canvas.width / 2, cy = canvas.height / 2;
     var lato = opts.lato === -1 ? -1 : 1;
+    var w = canvas.width, h = canvas.height;
+
+    // Cuscino: rettangolo chiaro nel terzo di canvas dal lato della testa, DIETRO il corpo.
+    // Un po' piu' alto del corpo (sporge sopra/sotto) cosi' si legge come oggetto a se',
+    // non come parte dello sprite.
+    var cuscinoW = w * 0.3;
+    var cuscinoX = lato === 1 ? 0 : w - cuscinoW;
+    ctx.fillStyle = CUSCINO_COLOR;
+    ctx.fillRect(cuscinoX, h * 0.12, cuscinoW, h * 0.76);
 
     ctx.save();
-    // ruota la creatura di un quarto di giro: "in piedi" (verticale) -> "disteso" (orizzontale).
-    // Verso di rotazione scelto cosi' la testa (riga 0 del frame) finisce a sinistra quando
-    // lato=1: si legge subito come "disteso sul fianco", non "in piedi ruotato a caso".
+    // ruota di un quarto di giro attorno al centro: "in piedi" (verticale) -> "disteso"
+    // (orizzontale). Verso scelto cosi' la testa (riga 0 del frame) finisce dal lato "lato",
+    // sovrapposta al cuscino appena disegnato.
     ctx.translate(cx, cy);
     ctx.rotate(lato === 1 ? -Math.PI / 2 : Math.PI / 2);
     ctx.translate(-cx, -cy);
@@ -319,10 +341,30 @@ window.PETQ = window.PETQ || {};
     }
     ctx.restore();
 
-    // occhi chiusi + Zzz sopra, NON ruotati (restano leggibili in orizzontale): drawSonno usa
-    // gia' coordinate relative al terzo superiore/lato del canvas, valide anche qui perche'
-    // il canvas resta PET_PX x PET_PX quadrato.
-    drawSonno(ctx, opts.frame);
+    // Coperta: fascia semi-trasparente sulla meta' del corpo LONTANA dalla testa (dove
+    // starebbero gambe/piedi), NON ruotata (resta un rettangolo pulito allineato al canvas).
+    // Rinforza la lettura "disteso sotto una coperta" senza dover disegnare gambe/piedi
+    // per ogni creatura.
+    var copertaW = w * 0.62;
+    var copertaX = lato === 1 ? (w - copertaW) : 0;
+    ctx.fillStyle = COPERTA_COLOR;
+    ctx.fillRect(copertaX, h * 0.2, copertaW, h * 0.68);
+
+    // occhi chiusi: NON riusiamo drawPalpebre "di fronte" (due fasce ai lati sinistro/destro
+    // pensate per il volto frontale in piedi) perche' ruotata di 90 gradi diventerebbe
+    // un'unica fascia scura che taglia tutta la larghezza del canvas, sopra il cuscino incluso
+    // (bug visto in verifica manuale). Da sdraiato disegniamo invece un trattino unico,
+    // piccolo, posizionato sopra la testa (accanto al cuscino, lato "lato").
+    var palpX = lato === 1 ? w * 0.32 : w * 0.5;
+    ctx.fillStyle = "rgba(20,20,24,0.75)";
+    ctx.fillRect(palpX, h * 0.28, w * 0.18, h * 0.06);
+    // Zzz: SOLO se il chiamante non li ridisegna gia' altrove (opts.zzz === false). Bug noto
+    // (fix 5 lug 2026): sul mini-canvas quadrato del pet (16x16 logici) le "Z" piu' grandi
+    // escono dal bordo superiore/destro (drawZzz usa y negativi e x+size>16, v. sotto) — il
+    // chiamante con una scena piu' ampia (canvas stanza) puo' passare zzz:false e richiamare
+    // PETQ.sprites.drawZzz direttamente sul canvas stanza, dove il margine extra le contiene
+    // per intero (v. ui.js disegnaZzzStanza).
+    if (opts.zzz !== false) drawZzz(ctx, opts.frame);
   }
 
   // ===== Icone cibo 12x12 (outline scuro + fill, "." trasparente) =====
@@ -496,10 +538,15 @@ window.PETQ = window.PETQ || {};
     ctx.fillRect(9 * s, 6 * s, 4 * s, 1 * s);
   }
 
-  // 2-3 "Z" pixel animabili sopra la testa del pet, 2 frame (alternano posizione/dimensione)
-  function drawZzz(ctx, frame) {
+  // 2-3 "Z" pixel animabili sopra la testa del pet, 2 frame (alternano posizione/dimensione).
+  // "scale" opzionale: pixel-schermo per unita' logica (griglia 16x16). Se omesso si ricava da
+  // ctx.canvas.width/SIZE come prima (caso tipico: si disegna sul mini-canvas del pet stesso).
+  // Il chiamante puo' passarlo esplicitamente per disegnare le Z altrove (es. sul canvas
+  // stanza, molto piu' ampio, per non farle clippare dal bordo del mini-canvas del pet — v.
+  // ui.js disegnaZzzStanza, fix del bug noto di clipping).
+  function drawZzz(ctx, frame, scale) {
     if (!ctx) return;
-    var s = ctx.canvas.width / SIZE;
+    var s = scale || (ctx.canvas.width / SIZE);
     var f = frame === 1 ? 1 : 0;
     ctx.fillStyle = ZZZ_COLOR;
     var zetas = f === 1
