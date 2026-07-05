@@ -41,9 +41,13 @@ window.PETQ = window.PETQ || {};
     var pools = data && data.personalita && data.personalita[personalita];
 
     // 30% delle battute contestuali pescano dal pool 'parola' se il giocatore ha insegnato
-    // almeno una parola ({parola} = una a caso tra le insegnate, v. riempiSlot sopra)
+    // almeno una parola ({parola} = una a caso tra le insegnate, v. riempiSlot sopra).
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "uso_parola=50%", Cervellone): la probabilita'
+    // sale al 50% per questo pet, letta a runtime da PETQ.talenti.usoParolaProb (default = PROB_PAROLA
+    // stesso valore di bilanciamento.md, 30%, se il talento non e' attivo o il modulo non e' pronto).
+    var probParola = (state && PETQ.talenti && PETQ.talenti.usoParolaProb) ? PETQ.talenti.usoParolaProb(state) : PROB_PAROLA;
     if (SITUAZIONI_PAROLA[situazione] && state && state.parole && state.parole.length > 0 &&
-        pools && pools.parola && pools.parola.length > 0 && PETQ.rng.rand() < PROB_PAROLA) {
+        pools && pools.parola && pools.parola.length > 0 && PETQ.rng.rand() < probParola) {
       situazione = 'parola';
     }
 

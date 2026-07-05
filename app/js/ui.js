@@ -2017,11 +2017,18 @@ window.PETQ = window.PETQ || {};
   }
 
   // Costo cura mostrato in UI: dalla config se un giorno verrà mappata
-  // (bilanciamento.infermeria.costo), altrimenti 15 come hardcoded in care.cura
+  // (bilanciamento.infermeria.costo), altrimenti 15 come hardcoded in care.cura.
+  // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "infermeria_costo=-5", Infermiere Provetto): il
+  // prezzo mostrato DEVE riflettere lo sconto del talento (v. care._costoCuraEffettivo, stessa
+  // funzione usata davvero da care.cura al click), altrimenti il bottone mente sul prezzo reale.
   function costoCura() {
+    var base = 15;
     var bil = bilanciamento();
-    if (bil.infermeria && typeof bil.infermeria.costo === 'number') return bil.infermeria.costo;
-    return 15;
+    if (bil.infermeria && typeof bil.infermeria.costo === 'number') base = bil.infermeria.costo;
+    if (PETQ.talenti && PETQ.talenti.infermeriaModCosto) {
+      base = Math.max(0, base + PETQ.talenti.infermeriaModCosto(currentState));
+    }
+    return base;
   }
 
   function cureEsauriteOggi() {
@@ -2163,14 +2170,21 @@ window.PETQ = window.PETQ || {};
     inputParola.type = 'text';
     inputParola.className = 'petq-input petq-input-piccolo';
     inputParola.placeholder = 'Nuova parola...';
-    var giaInsegnato = currentState.wordDay === oggi;
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "parole_giorno=4", Cervellone): il tetto
+    // giornaliero di parole insegnabili non e' piu' fisso a 1 (v. care.js paroleInsegnateOggi/
+    // PETQ.talenti.parolePerGiorno), stesso pattern di allenamentoEsauritoOggi.
+    var maxParoleGiorno = (PETQ.talenti && PETQ.talenti.parolePerGiorno) ? PETQ.talenti.parolePerGiorno(currentState) : 1;
+    var paroleFatteOggi = (PETQ.care && PETQ.care.paroleInsegnateOggi) ? PETQ.care.paroleInsegnateOggi(currentState) : (currentState.wordDay === oggi ? 1 : 0);
+    var giaInsegnato = paroleFatteOggi >= maxParoleGiorno;
     if (giaInsegnato || inMissione) inputParola.disabled = true;
     paroleWrap.appendChild(inputParola);
 
     var paroleBtn = el('button', 'petq-btn petq-btn-piccolo', 'Insegna parola');
     if (giaInsegnato || inMissione) {
       paroleBtn.disabled = true;
-      paroleBtn.title = giaInsegnato ? 'Parola già insegnata oggi' : nome + ' è in missione';
+      paroleBtn.title = giaInsegnato ? 'Parole di oggi esaurite (' + paroleFatteOggi + '/' + maxParoleGiorno + ')' : nome + ' è in missione';
+    } else if (maxParoleGiorno > 1) {
+      paroleBtn.title = 'Parole insegnate oggi: ' + paroleFatteOggi + '/' + maxParoleGiorno;
     }
     paroleBtn.addEventListener('click', function () {
       var r = PETQ.care.teachWord(currentState, inputParola.value);
@@ -3297,6 +3311,7 @@ window.PETQ = window.PETQ || {};
       currentState.trainCount = 0;
       currentState.studioVeloceDay = null;
       currentState.wordDay = null;
+      currentState.wordCount = 0;
       currentState.coccoleDay = null;
       currentState.coccoleCount = 0;
       currentState.cureDay = null;

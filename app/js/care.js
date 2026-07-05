@@ -308,10 +308,21 @@ window.PETQ = window.PETQ || {};
 
   var STAT_LABEL_TRAIN = { forza: 'Forza', intelligenza: 'Intelligenza', velocita: 'Velocità', carisma: 'Carisma' };
 
+  // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "parole_giorno=4", Cervellone): quante parole si
+  // possono insegnare OGGI (default 1, 4 con Cervellone). Stesso pattern di
+  // allenamentiFattiOggi/allenamentiPerGiorno: state.wordDay resta la data dell'ultimo
+  // insegnamento (serve solo per sapere quando azzerare state.wordCount sotto), state.wordCount
+  // conta quante parole sono state insegnate OGGI, confrontato col tetto dei talenti.
+  function paroleInsegnateOggi(state) {
+    if (!state) return 0;
+    return (state.wordDay === oggiStr()) ? (state.wordCount || 0) : 0;
+  }
+
   function teachWord(state, parola) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
     var oggi = oggiStr();
-    if (state.wordDay === oggi) {
+    var maxGiorno = (PETQ.talenti && PETQ.talenti.parolePerGiorno) ? PETQ.talenti.parolePerGiorno(state) : 1;
+    if (paroleInsegnateOggi(state) >= maxGiorno) {
       return { ok: false, msg: 'Parola già insegnata oggi.' };
     }
     var pulita = (parola || '').trim();
@@ -325,7 +336,11 @@ window.PETQ = window.PETQ || {};
     if (!state.parole) state.parole = [];
     state.parole.push(pulita);
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + felicitaBonus, 0, 100);
-    state.wordDay = oggi;
+    if (state.wordDay !== oggi) {
+      state.wordDay = oggi;
+      state.wordCount = 0;
+    }
+    state.wordCount = (state.wordCount || 0) + 1;
     PETQ.pet.recomputeSalute(state.pet, state);
 
     return { ok: true, msg: (state.pet.nome || 'Il pet') + ' ha imparato: ' + pulita + '.' };
@@ -408,7 +423,15 @@ window.PETQ = window.PETQ || {};
     // Diario (PROTOTIPO-2.md punto 6): l'esito missione di ieri non conta piu' per la pagina
     // diario di oggi (v. missions.risolvi, che lo riscrive quando si risolve una missione oggi).
     state.esitoMissioneGiorno = null;
-    if (PETQ.pet && typeof PETQ.pet.guarisciGiorno === 'function') {
+
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "notte=ferite=0", Anima Candida): ogni notte
+    // azzera del tutto le Ferite, AL POSTO della guarigione naturale -5 (non in aggiunta: il
+    // talento e' strettamente migliore, non ha senso sottrarre prima e poi azzerare). Se il
+    // talento non e' attivo, comportamento invariato (guarisciGiorno, -5 Ferite).
+    var azzeraNotte = (PETQ.talenti && PETQ.talenti.azzeraFeriteNotte) ? PETQ.talenti.azzeraFeriteNotte(state) : false;
+    if (azzeraNotte) {
+      state.ferite = 0;
+    } else if (PETQ.pet && typeof PETQ.pet.guarisciGiorno === 'function') {
       PETQ.pet.guarisciGiorno(state);
     }
 
@@ -429,6 +452,20 @@ window.PETQ = window.PETQ || {};
   var CURA_FERITE_RIDOTTE = 30;
   var CURA_MAX_DIE = 2;
 
+  // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "infermeria_costo=-5"/"infermeria_cura=+10",
+  // Infermiere Provetto): costo/cura effettivi = base + delta dai talenti (delta gia' col segno
+  // giusto, es. -5 sul costo -> 15-5=10; +10 sulla cura -> 30+10=40). Clampati per sicurezza
+  // (costo mai negativo, cura mai negativa) anche se nessun talento attuale ci arriva vicino.
+  function costoCuraEffettivo(state) {
+    var delta = (PETQ.talenti && PETQ.talenti.infermeriaModCosto) ? PETQ.talenti.infermeriaModCosto(state) : 0;
+    return Math.max(0, CURA_COSTO + delta);
+  }
+
+  function feriteRidotteEffettivo(state) {
+    var delta = (PETQ.talenti && PETQ.talenti.infermeriaModCura) ? PETQ.talenti.infermeriaModCura(state) : 0;
+    return Math.max(0, CURA_FERITE_RIDOTTE + delta);
+  }
+
   function cura(state) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
     if (typeof state.ferite !== 'number') state.ferite = 0;
@@ -445,16 +482,18 @@ window.PETQ = window.PETQ || {};
     if ((state.cureOggi || 0) >= CURA_MAX_DIE) {
       return { ok: false, msg: 'Cure di oggi esaurite, torna domani.' };
     }
-    if ((state.coins || 0) < CURA_COSTO) {
+    var costo = costoCuraEffettivo(state);
+    if ((state.coins || 0) < costo) {
       return { ok: false, msg: 'Monete insufficienti.' };
     }
 
-    state.coins -= CURA_COSTO;
-    state.ferite = clamp(state.ferite - CURA_FERITE_RIDOTTE, 0, 100);
+    var feriteRidotte = feriteRidotteEffettivo(state);
+    state.coins -= costo;
+    state.ferite = clamp(state.ferite - feriteRidotte, 0, 100);
     state.cureOggi = (state.cureOggi || 0) + 1;
     PETQ.pet.recomputeSalute(state.pet, state);
 
-    return { ok: true, msg: 'Cura effettuata: -' + CURA_FERITE_RIDOTTE + ' ferite.' };
+    return { ok: true, msg: 'Cura effettuata: -' + feriteRidotte + ' ferite.' };
   }
 
   window.PETQ.care = {
@@ -467,6 +506,7 @@ window.PETQ = window.PETQ || {};
     allenamentiFattiOggi: allenamentiFattiOggi,
     studioVeloce: studioVeloce,
     teachWord: teachWord,
+    paroleInsegnateOggi: paroleInsegnateOggi,
     dailyLogin: dailyLogin,
     cura: cura,
     capCoccoleGiorno: capCoccoleGiorno,
@@ -474,7 +514,11 @@ window.PETQ = window.PETQ || {};
     _sogliaSovralimentazione: sogliaSovralimentazione,
     _feriteSovralimentazione: FERITE_SOVRALIMENTAZIONE,
     _durataAllenamentoOre: DURATA_ALLENAMENTO_ORE,
-    _coccolaMaxDieDefault: COCCOLA_MAX_DIE_DEFAULT
+    _coccolaMaxDieDefault: COCCOLA_MAX_DIE_DEFAULT,
+    _curaCostoDefault: CURA_COSTO,
+    _curaFeriteRidotteDefault: CURA_FERITE_RIDOTTE,
+    _costoCuraEffettivo: costoCuraEffettivo,
+    _feriteRidotteEffettivo: feriteRidotteEffettivo
   };
 
 })();

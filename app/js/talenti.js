@@ -110,10 +110,32 @@ window.PETQ = window.PETQ || {};
     var attivi = talentiAttivi(state);
     for (var i = 0; i < attivi.length; i++) {
       var valGrezzo = trovaToken(attivi[i].effetti, 'passivo');
-      if (!valGrezzo) continue;
-      var parsed = parsePassivo(valGrezzo);
-      if (parsed && typeof somma[parsed.stat] === 'number') {
-        somma[parsed.stat] += parsed.valore;
+      if (valGrezzo) {
+        var parsed = parsePassivo(valGrezzo);
+        if (parsed && typeof somma[parsed.stat] === 'number') {
+          somma[parsed.stat] += parsed.valore;
+        }
+      }
+
+      // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "se igiene<50: passivo=int+2", Idrofobico):
+      // passivo CONDIZIONALE, non un "passivo=" secco come sopra (il token e' un'unica stringa
+      // libera "se igiene<50: passivo=int+2", stesso stile di "se fallimento_carattere: ..." in
+      // badLoserEffetto). NB: va controllato SEMPRE per ogni talento (niente early-continue sopra
+      // se manca il "passivo=" semplice: Idrofobico ha SOLO il condizionale, nessun "passivo="
+      // piatto, quindi un continue anticipato lo salterebbe del tutto). Sommato qui dentro
+      // bonusStatTutte (non in un helper separato) cosi' TUTTI i chiamanti esistenti (ui.js
+      // statConBonus/scheda, missions.bonusStatCombinato) lo vedono gratis, dinamicamente.
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        var mCond = t.match(/^se\s+igiene\s*<\s*(\d+)\s*:\s*passivo\s*=\s*([a-z]+)\s*([+-]\d+)$/i);
+        if (!mCond) continue;
+        var soglia = parseInt(mCond[1], 10);
+        var igieneAttuale = (state && state.pet && state.pet.stats && typeof state.pet.stats.igiene === 'number') ?
+          state.pet.stats.igiene : 100; // fallback ottimistico: senza dato niente bonus condizionale
+        if (igieneAttuale >= soglia) continue;
+        var statAlias = STAT_ALIAS_TALENTI[mCond[2].toLowerCase()] || (STAT_NOMI.indexOf(mCond[2].toLowerCase()) !== -1 ? mCond[2].toLowerCase() : null);
+        if (statAlias && typeof somma[statAlias] === 'number') somma[statAlias] += parseInt(mCond[3], 10);
       }
     }
     return somma;
@@ -556,6 +578,143 @@ window.PETQ = window.PETQ || {};
     return false; // stub: nessun tag missione esiste ancora, sempre false per costruzione
   }
 
+  // ==================== GRUPPO C: Salute, Sonno, Igiene, Parole (PROTOTIPO 2, Blocco 9) ====================
+  // Stesso pattern dei gruppi precedenti: talentiAttivi(state) -> trovaToken/scan di effetti[]
+  // -> parse del valore grezzo, letto SEMPRE a runtime (mai bakeato). Gli hook lato
+  // pet.js/care.js/dialog.js sono documentati nei commenti li' dove vengono chiamati.
+
+  // ---------- immune_malus_condizioni (Anima Candida) ----------
+  // Booleano: true se un talento attivo azzera il malus Salute da malus condizioni (fame/igiene/
+  // energia basse prolungate, cacca accumulata, dieta squilibrata). Usato da pet.malusCondizioni
+  // per ritornare 0 SENZA nemmeno calcolare i singoli malus (il pet resta comunque "sporco" o
+  // "affamato" nelle stat dirette, solo il malus SALUTE aggiuntivo sparisce).
+  function immuneMalusCondizioni(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        if ((effetti[j] || '').trim() === 'immune_malus_condizioni') return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- notte=ferite=0 (Anima Candida) ----------
+  // Booleano: true se un talento attivo azzera le Ferite ad ogni nuovo giorno (invece della
+  // guarigione naturale -5, v. pet.guarisciGiorno). Il chiamante (care.dailyLogin) decide se
+  // azzerare del tutto o sommare alla guarigione normale: qui ritorniamo solo "il pet ha questo
+  // talento", la MECCANICA (azzerare vs sottrarre) resta nel chiamante per restare vicino al
+  // pattern esistente (stesso principio di ignoraRifiutoEnergia/energiaAllenamentoOverride: il
+  // modulo talenti dice COSA, il modulo di gioco decide COME applicarlo allo stato).
+  function azzeraFeriteNotte(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        if (/^notte\s*=\s*ferite\s*=\s*0$/i.test(t)) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- infermeria_costo=-5 / infermeria_cura=+10 (Infermiere Provetto) ----------
+  // infermeriaModCosto: delta da SOMMARE al costo base dell'infermeria (care.CURA_COSTO), es.
+  // -5 -> 15-5=10. infermeriaModCura: delta da SOMMARE alle Ferite ridotte dalla cura
+  // (care.CURA_FERITE_RIDOTTE), es. +10 -> 30+10=40. Entrambi 0 se nessun talento li tocca.
+  function infermeriaModCosto(state) {
+    var attivi = talentiAttivi(state);
+    var delta = 0;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'infermeria_costo');
+      if (!valore) continue;
+      var m = valore.match(/^([+-]?\d+)$/);
+      if (m) delta += parseInt(m[1], 10);
+    }
+    return delta;
+  }
+
+  function infermeriaModCura(state) {
+    var attivi = talentiAttivi(state);
+    var delta = 0;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'infermeria_cura');
+      if (!valore) continue;
+      var m = valore.match(/^([+-]?\d+)$/);
+      if (m) delta += parseInt(m[1], 10);
+    }
+    return delta;
+  }
+
+  // ---------- risveglio=ferite-10 (Infermiere Provetto) ----------
+  // Ritorna il delta Ferite (gia' col segno, es. -10) da applicare ad OGNI risveglio dal sonno,
+  // o 0 se nessun talento attivo lo tocca. Il chiamante (pet.risolviRisveglio) somma questo
+  // delta a state.ferite (clampato) dopo aver applicato l'energia del risveglio.
+  function risveglioFeriteDelta(state) {
+    var attivi = talentiAttivi(state);
+    var delta = 0;
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        var m = t.match(/^risveglio\s*=\s*ferite\s*([+-]\d+)$/i);
+        if (m) delta += parseInt(m[1], 10);
+      }
+    }
+    return delta;
+  }
+
+  // ---------- igiene_felicita=inverti (Idrofobico) ----------
+  // Booleano: true se un talento attivo inverte la relazione Igiene<->Felicita'. Usato SOLO da
+  // pet.applyDecay per la parte Felicita' del decadimento: il malus Salute da sporco (v.
+  // malusCondizioni "igieneBassaMalus") NON e' toccato da questo helper (resta invariato, e' il
+  // contrappeso voluto dal design, v. talenti.md "nota=malus_salute_sporco_resta").
+  function igieneFelicitaInvertita(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'igiene_felicita');
+      if (valore && valore.trim().toLowerCase() === 'inverti') return true;
+    }
+    return false;
+  }
+
+  // ---------- parole_giorno=4 (Cervellone) ----------
+  // Ritorna il numero massimo di parole insegnabili al giorno (default 1, 4 con Cervellone).
+  var PAROLE_GIORNO_DEFAULT = 1;
+
+  function parolePerGiorno(state) {
+    var attivi = talentiAttivi(state);
+    var max = PAROLE_GIORNO_DEFAULT;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'parole_giorno');
+      if (valore === null) continue;
+      var n = parseInt(valore, 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+    return max;
+  }
+
+  // ---------- uso_parola=50% (Cervellone) ----------
+  // Ritorna la probabilita' [0,1] che il pet usi una parola imparata nelle battute contestuali
+  // (default = valore base di bilanciamento.md "Frequenza uso parola imparata", 30%; 50% con
+  // Cervellone). dialog.js legge questo helper invece di usare la costante PROB_PAROLA fissa.
+  var USO_PAROLA_BASE = 0.30;
+
+  function usoParolaProb(state) {
+    var attivi = talentiAttivi(state);
+    var prob = USO_PAROLA_BASE;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'uso_parola');
+      if (!valore) continue;
+      var m = valore.match(/^(\d+(?:[.,]\d+)?)\s*%$/);
+      if (m) {
+        var p = parseFloat(m[1].replace(',', '.')) / 100;
+        if (p > prob) prob = p; // vince il piu' alto, stesso principio di allenamentiPerGiorno
+      }
+    }
+    return prob;
+  }
+
   // ==================== REGISTRY token NON ancora agganciati (TODO batch futuri) ====================
   // Elenco di TUTTI i token del DSL "Dati" (v. content/talenti.md legenda in cima) che il
   // parser gia' legge dentro talento.effetti ma che NESSUN sistema di gioco applica ancora.
@@ -576,15 +735,14 @@ window.PETQ = window.PETQ || {};
   //                              3/Blocco 9. Talenti coinvolti: Amante della Natura, Inventore.
   //                              NON aggiungere il campo tag al DSL missioni qui: lo fa il batch
   //                              missioni; questo modulo si limita allo stub finche' non esiste)
-  //   igiene_felicita=inverti -> relazione Igiene<->Felicita' invertita (Idrofobico)
-  //   immune_malus_condizioni -> mai malus Salute dai malus condizioni (Anima Candida)
-  //   notte=ferite=0          -> azzera le Ferite ogni notte (Anima Candida)
-  //   infermeria_costo=...    -> sconto sul costo dell'infermeria
-  //   infermeria_cura=...     -> cura extra dall'infermeria
-  //   risveglio=...           -> effetto automatico ad ogni risveglio (es. ferite-10)
-  //   parole_giorno=...       -> aumenta il tetto di parole insegnabili al giorno
-  //   uso_parola=...          -> probabilita' che il pet usi la parola imparata nelle battute
   //   nota=...                -> annotazioni testuali non meccaniche (es. "malus_salute_sporco_resta")
+  //
+  // AGGIORNATO in questo batch (Gruppo C — Salute/Sonno/Igiene/Parole): rimossi dalla lista
+  // igiene_felicita, immune_malus_condizioni, notte, infermeria_costo, infermeria_cura,
+  // risveglio, parole_giorno, uso_parola — ora agganciati (v. sezione "GRUPPO C" sopra). Restano
+  // SOLO furto/invenzione (da fare), perk_tag (stub pronto) e nota (solo descrittivo, mai
+  // meccanico per design: v. talenti.md "malus_salute_sporco_resta", che documenta che il malus
+  // Salute da sporco di Idrofobico resta invariato apposta, non e' un token da agganciare).
   //
   // Quando si implementa uno di questi in un batch futuro: aggiungere l'hook nel sistema
   // pertinente (missions.js/care.js/pet.js/dialog.js) SUL MODELLO di bonusStat/capCoccole sopra
@@ -592,14 +750,12 @@ window.PETQ = window.PETQ || {};
 
   var TOKEN_NON_AGGANCIATI = [
     'furto', 'invenzione', 'perk_tag (stub pronto, attende tag missione P2)',
-    'igiene_felicita', 'immune_malus_condizioni', 'notte',
-    'infermeria_costo', 'infermeria_cura', 'risveglio',
-    'parole_giorno', 'uso_parola', 'nota'
+    'nota (solo descrittivo, mai meccanico per design)'
   ];
 
   // Prefissi/token esatti ormai AGGANCIATI (passivo/cap_coccole dal batch core + Gruppo A +
-  // Gruppo B di questo batch): usati da tokenNonAgganciati sotto per non segnalarli come
-  // "silenti" nel debug/scheda, pur essendo ancora presenti come token grezzi in effetti[].
+  // Gruppo B + Gruppo C di questo batch): usati da tokenNonAgganciati sotto per non segnalarli
+  // come "silenti" nel debug/scheda, pur essendo ancora presenti come token grezzi in effetti[].
   // perk_tag= resta escluso (e' un prefisso agganciato "a meta'": letto ma senza effetto finche'
   // non esistono i tag missione), quindi NON e' nella lista qui sotto apposta, cosi'
   // tokenNonAgganciati continua a segnalarlo come "silente" finche' non fa davvero qualcosa.
@@ -607,14 +763,17 @@ window.PETQ = window.PETQ || {};
     'passivo=', 'cap_coccole=', 'bonus_cibo=', 'blocca_cibo=', 'bonus_allenamento=',
     'allenamenti_giorno=', 'allenamento_extra=', 'allenamento_durata=', 'allenamento_energia=',
     'energia_decay=', 'bonus_missione=', 'ogni_missione=', 'mancia=', 'login=',
-    'blocca_categoria=', 'fallimento=', 'bonus_missione_monete=', 'missione_durata='
+    'blocca_categoria=', 'fallimento=', 'bonus_missione_monete=', 'missione_durata=',
+    'igiene_felicita=', 'infermeria_costo=', 'infermeria_cura=', 'parole_giorno=', 'uso_parola='
   ];
-  var TOKEN_ESATTI_AGGANCIATI = ['ignora_rifiuto_energia'];
+  var TOKEN_ESATTI_AGGANCIATI = ['ignora_rifiuto_energia', 'immune_malus_condizioni'];
 
   // Prefisso libero agganciato (non "chiave=valore" pulito, v. badLoserEffetto): riconosciuto a
   // parte perche' PREFISSI_AGGANCIATI/TOKEN_ESATTI_AGGANCIATI sopra coprono solo i due formati
-  // regolari.
-  var PREFISSO_LIBERO_AGGANCIATO = 'se fallimento_carattere:';
+  // regolari. Gruppo C aggiunge "notte=ferite=0" (chiave=valore=valore, non nel formato "chiave=
+  // valore" semplice di trovaToken) e "risveglio=ferite-10" (chiave=stat-N, non chiave=+/-numero
+  // come infermeria_costo/cura) e il token libero "se igiene<...: passivo=..." (Idrofobico).
+  var PREFISSI_LIBERI_AGGANCIATI = ['se fallimento_carattere:', 'notte=ferite=0', 'risveglio=ferite', 'se igiene<'];
 
   // Ritorna, per i talenti attivi del pet, la lista di token grezzi presenti nei loro `effetti`
   // che NON sono tra quelli agganciati sopra — utile per il debug/scheda per segnalare "questo
@@ -628,7 +787,11 @@ window.PETQ = window.PETQ || {};
         var t = (effetti[j] || '').trim();
         if (t === '') continue;
         if (TOKEN_ESATTI_AGGANCIATI.indexOf(t) !== -1) continue;
-        if (t.toLowerCase().indexOf(PREFISSO_LIBERO_AGGANCIATO) === 0) continue;
+        var liberoAgganciato = false;
+        for (var p = 0; p < PREFISSI_LIBERI_AGGANCIATI.length; p++) {
+          if (t.toLowerCase().indexOf(PREFISSI_LIBERI_AGGANCIATI[p]) === 0) { liberoAgganciato = true; break; }
+        }
+        if (liberoAgganciato) continue;
         var aggancio = false;
         for (var k = 0; k < PREFISSI_AGGANCIATI.length; k++) {
           if (t.indexOf(PREFISSI_AGGANCIATI[k]) === 0) { aggancio = true; break; }
@@ -669,8 +832,19 @@ window.PETQ = window.PETQ || {};
     badLoserEffetto: badLoserEffetto,
     categoriaBloccata: categoriaBloccata,
     perkTagAttivo: perkTagAttivo,
+    // Gruppo C (Salute/Sonno/Igiene/Parole)
+    immuneMalusCondizioni: immuneMalusCondizioni,
+    azzeraFeriteNotte: azzeraFeriteNotte,
+    infermeriaModCosto: infermeriaModCosto,
+    infermeriaModCura: infermeriaModCura,
+    risveglioFeriteDelta: risveglioFeriteDelta,
+    igieneFelicitaInvertita: igieneFelicitaInvertita,
+    parolePerGiorno: parolePerGiorno,
+    usoParolaProb: usoParolaProb,
     _capCoccoleDefault: CAP_COCCOLE_DEFAULT,
     _allenamentiGiornoDefault: ALLENAMENTI_GIORNO_DEFAULT,
+    _paroleGiornoDefault: PAROLE_GIORNO_DEFAULT,
+    _usoParolaBase: USO_PAROLA_BASE,
     _tokenNonAgganciatiRegistry: TOKEN_NON_AGGANCIATI,
     _trovaToken: trovaToken
   };

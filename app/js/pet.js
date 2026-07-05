@@ -224,9 +224,33 @@ window.PETQ = window.PETQ || {};
       PETQ.talenti.energiaDecayMult(state) : 1;
     pet.stats.energia = clamp(pet.stats.energia - es.decadimento * gameHours * decayMult, 0, 100);
 
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "igiene_felicita=inverti", Idrofobico): relazione
+    // Igiene<->Felicita' invertita SOLO per questo pet. Normalmente fame<critica O igiene<critica
+    // aggiungono UN malus Felicita' extra fisso (+5/h, non cumulativo se entrambe basse insieme
+    // — comportamento originale preservato qui sotto per il caso non-Idrofobico). Con Idrofobico
+    // separiamo i due contributi: la fame bassa continua a dare il malus normale, l'igiene bassa
+    // NON da' piu' malus (niente extra da sporco) e in piu' da' un piccolo BONUS Felicita' (lo
+    // sporco rende felice, v. talenti.md). Il malus SALUTE da sporco (v. malusCondizioni
+    // "igieneBassaMalus" sopra, invariato) resta com'e' apposta: e' il contrappeso di design
+    // (talenti.md "il malus Salute da sporco resta"), qui tocchiamo SOLO il ramo Felicita'.
+    var igieneInvertita = (state && PETQ.talenti && PETQ.talenti.igieneFelicitaInvertita) ?
+      PETQ.talenti.igieneFelicitaInvertita(state) : false;
+
     var calofelicita = dec.felicita * gameHours;
-    if (pet.stats.fame < soglie.critica || pet.stats.igiene < soglie.critica) {
-      calofelicita += 5 * gameHours;
+    if (!igieneInvertita) {
+      // comportamento originale: malus unico (no doppio conteggio se fame E igiene sono basse insieme)
+      if (pet.stats.fame < soglie.critica || pet.stats.igiene < soglie.critica) {
+        calofelicita += 5 * gameHours;
+      }
+    } else {
+      // Idrofobico: i due contributi si calcolano separatamente (la fame bassa resta un malus
+      // normale, l'igiene bassa diventa un bonus) e possono sommarsi se entrambe sono basse.
+      if (pet.stats.fame < soglie.critica) {
+        calofelicita += 5 * gameHours;
+      }
+      if (pet.stats.igiene < soglie.critica) {
+        calofelicita -= 5 * gameHours;
+      }
     }
     if (pet.stats.energia < es.sogliaRifiuto) {
       calofelicita += 1 * gameHours; // GDD: sotto soglia energia, felicita' -1/h extra
@@ -294,6 +318,15 @@ window.PETQ = window.PETQ || {};
 
   function malusCondizioni(pet, state) {
     if (!state) return 0;
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "immune_malus_condizioni", Anima Candida): il
+    // pet non perde MAI Salute dai malus condizioni (fame/igiene/energia basse prolungate,
+    // cacca accumulata, dieta squilibrata). Le stat dirette restano invariate (il pet resta
+    // comunque "sporco"/"affamato" a vedersi): solo questo malus SALUTE aggiuntivo sparisce,
+    // niente calcolo dei singoli malus sotto (uscita anticipata, stesso spirito di
+    // energiaSottoSoglia/ignoraRifiutoEnergia: il talento dice COSA, qui si applica il COME).
+    if (PETQ.talenti && PETQ.talenti.immuneMalusCondizioni && PETQ.talenti.immuneMalusCondizioni(state)) {
+      return 0;
+    }
     var m = 0;
     var oraMs = Date.now();
 
@@ -542,6 +575,18 @@ window.PETQ = window.PETQ || {};
     if (state.pet) {
       state.pet.stats.energia = clamp(energiaFinale, 0, 100);
     }
+
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo C, "risveglio=ferite-10", Infermiere Provetto):
+    // auto-cura automatica ad OGNI risveglio (manuale o autonomo, riposino o notturno — il
+    // talento non distingue, v. talenti.md "1 auto-cura -10 Ferite a ogni risveglio"). Applicato
+    // qui, prima di azzerare state.sonno, cosi' recomputeSalute sotto vede gia' le Ferite giuste.
+    if (typeof state.ferite !== 'number') state.ferite = 0;
+    var deltaFeriteRisveglio = (PETQ.talenti && PETQ.talenti.risveglioFeriteDelta) ?
+      PETQ.talenti.risveglioFeriteDelta(state) : 0;
+    if (deltaFeriteRisveglio !== 0) {
+      state.ferite = clamp(state.ferite + deltaFeriteRisveglio, 0, 100);
+    }
+
     state.sonno = null;
     recomputeSalute(state.pet, state);
 
