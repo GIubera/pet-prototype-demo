@@ -280,6 +280,10 @@ window.PETQ = window.PETQ || {};
     // nuovo giorno: azzera i contatori giornalieri del pacing cibo/cure, guarigione naturale ferite
     state.categoriePastiOggi = [];
     state.cureOggi = 0;
+
+    // Diario (PROTOTIPO-2.md punto 6): l'esito missione di ieri non conta piu' per la pagina
+    // diario di oggi (v. missions.risolvi, che lo riscrive quando si risolve una missione oggi).
+    state.esitoMissioneGiorno = null;
     if (PETQ.pet && typeof PETQ.pet.guarisciGiorno === 'function') {
       PETQ.pet.guarisciGiorno(state);
     }

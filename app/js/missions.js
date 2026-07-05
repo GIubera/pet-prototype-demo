@@ -671,6 +671,12 @@ window.PETQ = window.PETQ || {};
     // limite 1 missione al giorno (fix playtest): marca il giorno alla risoluzione;
     // avvia() rifiuta finche' non cambia data (il debug "Nuovo giorno" azzera questo campo)
     state.missioneGiorno = oggiStr();
+    // Diario (PROTOTIPO-2.md punto 6): traccia l'esito della missione DI OGGI per la pagina
+    // diario serale (PETQ.diario.componiPagina legge questo campo). 'super'/'standard' -> riga
+    // "Missione andata bene", 'fallimento' -> "andata male". Azzerato al nuovo giorno da
+    // care.dailyLogin (mai persistere l'esito di ieri). Il tutorial (m0, risolviTutorial) non
+    // passa da qui: e' un regalo di benvenuto una tantum, non "la missione di oggi".
+    state.esitoMissioneGiorno = esito.tipo;
     // Cooldown missioni (bilanciamento.md "Cooldown missioni"): marca l'ultima esecuzione
     // ALLA RISOLUZIONE (non all'avvio), cosi' una missione abbandonata a meta' (mai possibile
     // nel prototipo, ma per coerenza futura) non entrerebbe in cooldown senza essere completata.

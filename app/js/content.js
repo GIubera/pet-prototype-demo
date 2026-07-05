@@ -67,10 +67,12 @@ window.PETQ = window.PETQ || {};
       cibi: [],
       arredi: [],
       bilanciamento: null,
-      missioni: []
+      missioni: [],
+      diario: {}
     },
     load: load,
-    _parseBilanciamento: parseBilanciamento // esposto per test di parsing (pattern _get*/_assert* del codebase)
+    _parseBilanciamento: parseBilanciamento, // esposto per test di parsing (pattern _get*/_assert* del codebase)
+    _parseDiario: parseDiario
   };
 
   function load(callback) {
@@ -82,6 +84,7 @@ window.PETQ = window.PETQ || {};
     percorsi.push('arredi');
     percorsi.push('bilanciamento');
     percorsi.push('missioni');
+    percorsi.push('diario');
 
     caricaTutti(percorsi, function (raw) {
       var data = window.PETQ.content.data;
@@ -96,6 +99,7 @@ window.PETQ = window.PETQ || {};
       data.cibi = parseCibi(raw['cibi'] || '');
       data.arredi = parseArredi(raw['arredi'] || '');
       data.missioni = parseMissioni(raw['missioni'] || '');
+      data.diario = parseDiario(raw['diario'] || '');
 
       var bilOk = null;
       try {
@@ -182,6 +186,105 @@ window.PETQ = window.PETQ || {};
       }
     }
     return null;
+  }
+
+  // ---------- parser diario (PROTOTIPO-2.md punto 6, content/diario.md) ----------
+  // Struttura: sezioni "## <Personalita>" (gentile/maleducato/nerd/sportivo, stesse chiavi di
+  // PERSONALITA_FILES) con sottosezioni "### <Titolo momento>" -> lista "- frammento".
+  // Match tollerante per SUBSTRING su titolo normalizzato (minuscolo, senza accenti/em-dash):
+  // "Cibo — mangiato bene" contiene sia 'cibo' che 'bene', "Umore — giù" contiene 'umore' e
+  // 'giu' una volta normalizzati gli accenti. L'ordine delle regole conta: le voci piu'
+  // specifiche (con sotto-stato) vanno PRIMA delle generiche altrimenti "Missione andata bene"
+  // matcherebbe solo la prima regola che contiene 'missione'.
+  var DIARIO_CHIAVI = ['apertura', 'cibo_bene', 'cibo_poco', 'missione_bene', 'missione_male',
+    'missione_nessuna', 'umore_bene', 'umore_stanco', 'umore_giu', 'coccole_ricevute',
+    'coccole_ignorato', 'chiusura'];
+
+  var DIARIO_SEZIONE_MAP = [
+    { match: ['apertura'], chiave: 'apertura' },
+    { match: ['cibo', 'bene'], chiave: 'cibo_bene' },
+    { match: ['cibo', 'poco'], chiave: 'cibo_poco' },
+    { match: ['nessuna missione'], chiave: 'missione_nessuna' },
+    { match: ['missione', 'bene'], chiave: 'missione_bene' },
+    { match: ['missione', 'male'], chiave: 'missione_male' },
+    { match: ['umore', 'bene'], chiave: 'umore_bene' },
+    { match: ['umore', 'stanc'], chiave: 'umore_stanco' },
+    { match: ['umore', 'giu'], chiave: 'umore_giu' },
+    { match: ['coccol', 'ricevut'], chiave: 'coccole_ricevute' },
+    { match: ['coccol', 'ignorat'], chiave: 'coccole_ignorato' },
+    { match: ['chiusura'], chiave: 'chiusura' }
+  ];
+
+  // normalizza minuscolo + toglie accenti (così "giù"/"perdute" matchano 'giu'/ecc.) e i
+  // trattini/em-dash del titolo ("Cibo — mangiato bene" -> "cibo mangiato bene")
+  function normalizzaTitolo(t) {
+    return (t || '').toLowerCase()
+      .replace(/[àá]/g, 'a').replace(/[èé]/g, 'e').replace(/[ìí]/g, 'i')
+      .replace(/[òó]/g, 'o').replace(/[ùú]/g, 'u')
+      .replace(/[—–]/g, ' ');
+  }
+
+  function mappaSezioneDiario(titolo) {
+    var t = normalizzaTitolo(titolo);
+    for (var i = 0; i < DIARIO_SEZIONE_MAP.length; i++) {
+      var termini = DIARIO_SEZIONE_MAP[i].match;
+      var tuttiPresenti = true;
+      for (var j = 0; j < termini.length; j++) {
+        if (t.indexOf(termini[j]) === -1) { tuttiPresenti = false; break; }
+      }
+      if (tuttiPresenti) return DIARIO_SEZIONE_MAP[i].chiave;
+    }
+    return null;
+  }
+
+  function vuotoDiarioPersonalita() {
+    var p = {};
+    for (var i = 0; i < DIARIO_CHIAVI.length; i++) p[DIARIO_CHIAVI[i]] = [];
+    return p;
+  }
+
+  // Ritorna { gentile: {apertura:[...], cibo_bene:[...], ...}, maleducato: {...}, ... }
+  // Stesso schema riga-per-riga di parsePersonalita: "## Personalita" apre un blocco
+  // personalita, "### Momento" apre la sotto-chiave dentro quel blocco, "- frammento" accoda.
+  function parseDiario(testo) {
+    var out = {};
+    for (var i = 0; i < PERSONALITA_FILES.length; i++) out[PERSONALITA_FILES[i]] = vuotoDiarioPersonalita();
+    if (!testo) return out;
+
+    var righe = testo.split(/\r?\n/);
+    var personalitaCorrente = null;
+    var chiaveCorrente = null;
+
+    for (var r = 0; r < righe.length; r++) {
+      var riga = righe[r].trim();
+      if (riga === '') continue;
+
+      if (riga.indexOf('### ') === 0) {
+        var titoloMomento = riga.substring(4).trim();
+        chiaveCorrente = mappaSezioneDiario(titoloMomento);
+        if (!chiaveCorrente) {
+          console.warn('PETQ.content: sottosezione diario non riconosciuta: "' + titoloMomento + '"');
+        }
+        continue;
+      }
+
+      if (riga.indexOf('## ') === 0) {
+        var titoloPersonalita = riga.substring(3).trim().toLowerCase();
+        personalitaCorrente = (out[titoloPersonalita]) ? titoloPersonalita : null;
+        if (!personalitaCorrente) {
+          console.warn('PETQ.content: personalita diario non riconosciuta: "' + titoloPersonalita + '"');
+        }
+        chiaveCorrente = null;
+        continue;
+      }
+
+      if (riga.indexOf('- ') === 0 && personalitaCorrente && chiaveCorrente) {
+        var frammento = riga.substring(2).trim();
+        if (frammento !== '') out[personalitaCorrente][chiaveCorrente].push(frammento);
+      }
+    }
+
+    return out;
   }
 
   // ---------- parser tabelle md (utility comune) ----------

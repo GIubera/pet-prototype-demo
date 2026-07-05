@@ -227,12 +227,21 @@ window.PETQ = window.PETQ || {};
 
   // Camera da letto (GDD "Casa" -> camera, playtest 4 lug 2026): 4a stanza, il letto qui
   // e' GRANDE e protagonista (era troppo piccolo nel salone). Comodino a fianco, finestra
-  // sopra la testiera. TODO feature futura: il diario della giornata (testi del socio) va
-  // appeso/appoggiato qui, probabilmente sul comodino o a muro sopra di esso.
+  // sopra la testiera.
   // Rettangoli letto (anche hotzone drag per la UI, pattern HOTZONE_VASCA): generosi,
   // protagonisti della scena, forma diversa per lab (capsula medicale) e ship (cupola).
   var LETTO_LAB_CAMERA = { x: 14, y: 20, w: 40, h: 30 };
   var LETTO_SHIP_CAMERA = { x: 14, y: 18, w: 40, h: 32 };
+
+  // Scrivania del diario (PROTOTIPO-2.md punto 6 "Diario in camera"): mobile a pavimento
+  // nell'angolo LIBERO a sinistra del letto (il letto inizia a x=14, room x=0..112). Zona
+  // scelta apposta per non sovrapporsi MAI col rettangolo del pet (hotzone tap, non solo
+  // grafica): il pet in camera sta a x40-72/y28-60 da fermo, e puo' arrivare fino a x24-88
+  // durante l'idle action "corre per casa" dello sportivo (v. ui.js posizionePet/
+  // IDLE_ACTIONS) — x0-14 resta sempre fuori da entrambi i range. Niente sovrapposizioni
+  // nemmeno con LETTO_*_CAMERA (inizia a x=14) ne' con SLOT_SPOTS.camera ([96,46] pavimento,
+  // [58,4] muro). Stessa hotzone per lab/ship (solo lo stile del mobile cambia).
+  var SCRIVANIA_CAMERA = { x: 0, y: 46, w: 14, h: 18 };
 
   // Frigo in cucina (GDD "Economia" -> "Spesa e dispensa"): hotzone tap sul frigo/capsula
   // criogenica gia' disegnati da labCucina/shipCucina, coordinate del rettangolo del mobile
@@ -259,6 +268,26 @@ window.PETQ = window.PETQ || {};
     // led di stato sulla scocca
     R(g, r.x + 3, r.y + r.h - 10, 3, 2, L.led);
   }
+  // Scrivania lab: piano metallico su gambe, lampada da tavolo + foglio/diario appoggiato
+  // (indizio visivo del suo uso, GDD "Diario in camera": qui il pet "va a scrivere"). Mobile
+  // compatto (14x18, v. SCRIVANIA_CAMERA) nell'angolo libero a sinistra del letto.
+  function labScrivania(g) {
+    var r = SCRIVANIA_CAMERA;
+    // gambe
+    R(g, r.x + 1, r.y + 9, 2, r.h - 9, L.metalloScuro);
+    R(g, r.x + r.w - 3, r.y + 9, 2, r.h - 9, L.metalloScuro);
+    // piano
+    O(g, r.x, r.y + 5, r.w, 5, L.out, L.metallo);
+    R(g, r.x + 1, r.y + 6, r.w - 2, 1, L.metalloChiaro);
+    // foglio/diario aperto sul piano
+    O(g, r.x + 2, r.y, 7, 5, L.out, L.crema);
+    R(g, r.x + 3, r.y + 1, 5, 1, L.cremaOmbra);
+    R(g, r.x + 3, r.y + 3, 3, 1, L.cremaOmbra);
+    // lampada da tavolo
+    R(g, r.x + r.w - 5, r.y - 5, 2, 5, L.metalloScuro);
+    O(g, r.x + r.w - 7, r.y - 8, 6, 4, L.out, L.ambra);
+  }
+
   function labCamera(g) {
     labWall(g, false);
     // finestra sopra la testiera del letto
@@ -271,6 +300,8 @@ window.PETQ = window.PETQ || {};
     R(g, 79, 36, 14, 1, L.cremaOmbra);
     R(g, 83, 22, 2, 8, L.metalloScuro);
     O(g, 80, 18, 8, 6, L.out, L.ambra);
+    // scrivania del diario, tra letto e comodino (GDD "Diario in camera")
+    labScrivania(g);
     // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
   }
 
@@ -292,6 +323,25 @@ window.PETQ = window.PETQ || {};
     R(g, r.x + 5, r.y + 13, 4, 2, S.ledC);
     R(g, r.x + r.w - 9, r.y + r.h - 9, 4, 2, S.ledM);
   }
+  // Scrivania ship: consolle sospesa luminosa con schermo/tavoletta al posto del foglio e
+  // pannellino led al posto della lampada (stesso ingombro/hotzone di labScrivania). Mobile
+  // compatto (14x18, v. SCRIVANIA_CAMERA) nell'angolo libero a sinistra del letto.
+  function shipScrivania(g) {
+    var r = SCRIVANIA_CAMERA;
+    // base/gambe
+    R(g, r.x + 1, r.y + 9, 2, r.h - 9, S.mobiletto);
+    R(g, r.x + r.w - 3, r.y + 9, 2, r.h - 9, S.mobiletto);
+    // piano luminoso
+    O(g, r.x, r.y + 5, r.w, 5, S.out, S.mobiletto);
+    R(g, r.x + 1, r.y + 6, r.w - 2, 1, S.glow);
+    // tavoletta/schermo con "pagina" del diario accesa
+    O(g, r.x + 2, r.y, 7, 5, S.out, S.mobilettoTop);
+    R(g, r.x + 3, r.y + 1, 5, 1, S.glow);
+    R(g, r.x + 3, r.y + 3, 3, 1, S.glow);
+    // pannellino led sospeso (ledPanel e' 9x10: alziamolo un po' per non sforare il muro sopra)
+    ledPanel(g, r.x + r.w - 9, r.y - 9);
+  }
+
   function shipCamera(g) {
     shipWall(g, S_WALLS.salone);
     oblo(g, 8, 6, 18, 13);
@@ -300,6 +350,8 @@ window.PETQ = window.PETQ || {};
     O(g, 78, 30, 16, 14, S.out, S.mobiletto);
     R(g, 80, 36, 12, 1, S.glow);
     ledPanel(g, 82, 18);
+    // scrivania del diario, tra letto e comodino (GDD "Diario in camera")
+    shipScrivania(g);
     // oggetti sulla mensola/comodino: spazio slot pavimento+muro gestito da SLOT_SPOTS.camera
   }
 
@@ -1188,10 +1240,21 @@ window.PETQ = window.PETQ || {};
         if (stanza === "camera" && (overlap(boxes[i], LETTO_LAB_CAMERA) || overlap(boxes[i], LETTO_SHIP_CAMERA))) {
           console.error("PETQ.rooms: slot camera[" + i + "] si sovrappone al letto");
         }
+        if (stanza === "camera" && overlap(boxes[i], SCRIVANIA_CAMERA)) {
+          console.error("PETQ.rooms: slot camera[" + i + "] si sovrappone alla scrivania");
+        }
       }
       if ((SLOT_TIPI[stanza] || []).length !== SLOT_SPOTS[stanza].length) {
         console.error("PETQ.rooms: _slotTipi." + stanza + " non allineato agli slot");
       }
+    }
+    // scrivania vs letto (entrambi i temi) e vs canvas: stessa verifica di sviluppo sopra
+    if (SCRIVANIA_CAMERA.x < 0 || SCRIVANIA_CAMERA.y < 0 ||
+        SCRIVANIA_CAMERA.x + SCRIVANIA_CAMERA.w > W || SCRIVANIA_CAMERA.y + SCRIVANIA_CAMERA.h > H) {
+      console.error("PETQ.rooms: _scrivania.camera esce dal canvas " + W + "x" + H);
+    }
+    if (overlap(SCRIVANIA_CAMERA, LETTO_LAB_CAMERA) || overlap(SCRIVANIA_CAMERA, LETTO_SHIP_CAMERA)) {
+      console.error("PETQ.rooms: _scrivania.camera si sovrappone al letto");
     }
   }
   assertSlots();
@@ -1254,6 +1317,9 @@ window.PETQ = window.PETQ || {};
     _assertSlots: assertSlots,
     // hotzone letto per tema (GDD "Casa" -> camera): la UI sceglie in base a temaRazza(pet)
     _letto: { camera: { lab: LETTO_LAB_CAMERA, ship: LETTO_SHIP_CAMERA } },
+    // hotzone scrivania (PROTOTIPO-2.md punto 6 "Diario in camera"): stessa hotzone per
+    // entrambi i temi (solo lo stile del mobile cambia, v. labScrivania/shipScrivania).
+    _scrivania: { camera: SCRIVANIA_CAMERA },
     // hotzone frigo per tema (GDD "Economia" -> "Spesa e dispensa"): tap -> menu posseduto
     _frigoZona: { cucina: { lab: FRIGO_LAB_CUCINA, ship: FRIGO_SHIP_CUCINA } },
     _arredi: Object.keys(ARREDI),

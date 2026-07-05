@@ -828,3 +828,60 @@ button {
   font-size: 11px;
   margin-right: 4px;
 }
+
+/* ---------- Diario (PROTOTIPO-2.md punto 6 "Diario in camera") ---------- */
+/* Overlay a foglio sopra la scena camera (niente reset di currentStanza: "Chiudi" si limita
+   a rimuovere questo nodo, cosi' si torna esattamente dov'era prima del tap sulla scrivania). */
+
+.petq-diario-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 20, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  padding: 20px;
+}
+
+.petq-diario-pagina {
+  background: #f2ede0;
+  color: #3a3020;
+  border-radius: 10px;
+  padding: 18px;
+  max-width: 380px;
+  width: 100%;
+  max-height: 82vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.petq-diario-titolo {
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+  color: #3a3020;
+}
+
+.petq-diario-riga {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  border-bottom: 1px dashed #c9bfa2;
+  padding-bottom: 8px;
+}
+
+.petq-diario-riga:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.petq-diario-vuoto {
+  text-align: center;
+  color: #8a7f63;
+  font-style: italic;
+}

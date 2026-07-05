@@ -32,6 +32,14 @@ window.PETQ = window.PETQ || {};
     if (perTema && perTema[tema]) return perTema[tema];
     return { x: 6, y: 10, w: 16, h: 34 };
   }
+
+  // hotzone scrivania (coordinate logiche stanza, camera — PROTOTIPO-2.md punto 6 "Diario in
+  // camera"): rettangolo esposto da PETQ.rooms._scrivania.camera, stessa per lab/ship (solo lo
+  // stile del mobile cambia). Niente parametro tema: la scrivania non si sposta tra i due temi.
+  function hotzoneScrivania() {
+    var z = PETQ.rooms && PETQ.rooms._scrivania && PETQ.rooms._scrivania.camera;
+    return z || { x: 56, y: 40, w: 20, h: 24 };
+  }
   // posizione del pet mentre dorme A LETTO (FIX: prima era un punto fisso {22,30} che non
   // teneva conto delle dimensioni reali del letto per tema e sforava sotto il bordo del
   // letto ship - v. rooms.js LETTO_LAB_CAMERA/LETTO_SHIP_CAMERA, che hanno x/y/w/h diversi).
@@ -718,9 +726,20 @@ window.PETQ = window.PETQ || {};
     return null;
   }
 
+  // posizione del pet durante l'animazione "va a scrivere" (tap sulla scrivania, GDD "Diario
+  // in camera"): appena a DESTRA del mobile (v. rooms.js SCRIVANIA_CAMERA, nell'angolo a
+  // sinistra del letto), sul pavimento, rivolto verso il piano dove poggia il foglio/tavoletta.
+  function scrivaniaPos() {
+    var r = hotzoneScrivania();
+    return { x: Math.min(ROOM_W - PET_PX, r.x + r.w - 4), y: ROOM_H - PET_PX - 4 };
+  }
+
   function posizionePet() {
     if (effetto && effetto.tipo === 'wash') {
       return { x: WASH_POS.x, y: WASH_POS.y };
+    }
+    if (effetto && effetto.tipo === 'scrivania') {
+      return scrivaniaPos();
     }
     if (currentState && currentState.sonno) {
       if (currentState.sonno.aLetto && currentStanza === 'camera') {
@@ -821,6 +840,17 @@ window.PETQ = window.PETQ || {};
         propCanvas.height = 12;
         disegnaProp(propCanvas, propTrain);
         g.drawImage(propCanvas, Math.min(pos.x + PET_PX - 2, ROOM_W - 12), pos.y + PET_PX - 13);
+      }
+
+      // Prop "scrive" (GDD "Diario in camera"): riusa l'icona libro/penna esistente durante
+      // la breve animazione di avvio della scrittura (v. avviaScrittura), stesso posizionamento
+      // angolare del prop allenamento cosi' non serve nuova grafica dedicata.
+      if (effetto && effetto.tipo === 'scrivania') {
+        var propScrivaniaCanvas = document.createElement('canvas');
+        propScrivaniaCanvas.width = 12;
+        propScrivaniaCanvas.height = 12;
+        disegnaProp(propScrivaniaCanvas, 'libro');
+        g.drawImage(propScrivaniaCanvas, Math.min(pos.x + PET_PX - 2, ROOM_W - 12), pos.y + PET_PX - 13);
       }
 
       // Prop dell'animazione idle di personalita' (GDD): nerd legge/cubo, gentile canta/
@@ -1363,6 +1393,8 @@ window.PETQ = window.PETQ || {};
       } else if (currentStanza === 'cucina' && !currentState.missione &&
                  dentroRect(p, hotzoneFrigo(temaRazza(currentState.pet)), 0)) {
         target = 'frigo';
+      } else if (currentStanza === 'camera' && dentroRect(p, hotzoneScrivania(), 0)) {
+        target = 'scrivania';
       } else {
         poopIdx = hitPoop(p);
         if (poopIdx !== -1) target = 'poop';
@@ -1440,6 +1472,8 @@ window.PETQ = window.PETQ || {};
         eseguiPuliziaBisogni(cp.poopIdx);
       } else if (cp.target === 'frigo') {
         apriFrigo();
+      } else if (cp.target === 'scrivania') {
+        avviaScrittura();
       }
     }
 
@@ -1507,6 +1541,33 @@ window.PETQ = window.PETQ || {};
       animazioneInCorso = false;
       var r = PETQ.care.wash(currentState);
       dopoAzione(r);
+    });
+  }
+
+  // Tap sulla scrivania in camera (PROTOTIPO-2.md punto 6 "Diario in camera"): il pet "va a
+  // scrivere" (~2s, stesso pattern animaTimed di avviaLavaggio/avviaAllenamento: completamento
+  // garantito anche se il timer viene congelato in background), poi si apre la pagina diario
+  // col riassunto della giornata corrente. Non disponibile mentre il pet e' occupato (sonno/
+  // allenamento/missione): in quei casi solo un toast, niente animazione ne' pagina.
+  var SCRITTURA_MS = 2000;
+
+  function avviaScrittura() {
+    if (!currentState || !currentState.pet) return;
+    if (currentState.sonno || currentState.allenamento || currentState.missione) {
+      mostraToast((currentState.pet.nome || 'Il pet') + ' ora non può: è occupato.');
+      return;
+    }
+    if (animazioneInCorso) return;
+    annullaIdleAction();
+
+    animazioneInCorso = true;
+    effetto = { tipo: 'scrivania' };
+    disegnaStanzaEPet(currentState);
+
+    animaTimed(SCRITTURA_MS, function () {
+      effetto = null;
+      animazioneInCorso = false;
+      mostraDiario(currentState);
     });
   }
 
@@ -1684,7 +1745,7 @@ window.PETQ = window.PETQ || {};
     } else if (currentState.allenamento) {
       container.appendChild(el('p', 'petq-hint', nome + ' si sta allenando: il letto aspetta che finisca.'));
     } else {
-      container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire: riposino di giorno, nanna vera dalle 21:00.'));
+      container.appendChild(el('p', 'petq-hint', 'Trascina ' + nome + ' nel letto per farlo dormire: riposino di giorno, nanna vera dalle 21:00. Tocca la scrivania per leggere il diario di oggi.'));
     }
   }
 
@@ -2793,6 +2854,46 @@ window.PETQ = window.PETQ || {};
     PETQ.save.save(currentState);
     mostraEvoluzione(currentState);
     return true;
+  }
+
+  // ==================== PAGINA DIARIO (PROTOTIPO-2.md punto 6 "Diario in camera") ====================
+  // Overlay "a foglio" sopra la scena camera (NON un app.innerHTML pieno come mostraEsito/
+  // mostraEvoluzione): "Chiudi" si limita a rimuovere il nodo, cosi' si resta esattamente sulla
+  // camera senza passare da mostraCasa (che resetterebbe currentStanza a 'cucina'). Le righe
+  // vengono dal contenuto assemblato da PETQ.diario.componiPagina in base agli eventi VERI
+  // della giornata corrente (cibo/missione/umore/coccole, v. diario.js).
+  function mostraDiario(state) {
+    if (!state || !state.pet) return;
+    var esistente = document.getElementById('petq-diario-overlay');
+    if (esistente) esistente.remove();
+
+    var overlay = el('div', 'petq-diario-overlay');
+    overlay.id = 'petq-diario-overlay';
+
+    var pagina = el('div', 'petq-diario-pagina');
+    pagina.appendChild(el('h2', 'petq-diario-titolo', 'Diario di ' + (state.pet.nome || 'il pet') + ' — sera'));
+
+    var righe = (PETQ.diario && PETQ.diario.componiPagina) ? PETQ.diario.componiPagina(state) : [];
+    if (righe.length === 0) {
+      pagina.appendChild(el('p', 'petq-diario-vuoto', '(pagina bianca: niente da raccontare oggi)'));
+    } else {
+      for (var i = 0; i < righe.length; i++) {
+        pagina.appendChild(el('p', 'petq-diario-riga', righe[i]));
+      }
+    }
+
+    var chiudiBtn = el('button', 'petq-btn petq-btn-primario', 'Chiudi');
+    chiudiBtn.addEventListener('click', function () { overlay.remove(); });
+    pagina.appendChild(chiudiBtn);
+
+    overlay.appendChild(pagina);
+    // click sullo sfondo scuro (fuori dal foglio) chiude come il bottone, stesso gesto atteso
+    // di un modale; il click sul foglio stesso non deve propagare e chiuderlo per errore.
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
   }
 
   // slot nei testi esito: {oggetto} = il primo arredo/arma dei reward (tutorial M0), {nome} = pet
