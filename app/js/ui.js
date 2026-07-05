@@ -1673,10 +1673,19 @@ window.PETQ = window.PETQ || {};
   // (guidati da state.allenamento, non da `effetto`/animazioneInCorso locali) a mostrare lo
   // stato "in corso" con countdown finche' non arriva il completamento (v.
   // controllaAllenamentoScaduto), esattamente come le missioni mostrano "torna tra X".
+  // Allenamenti esauriti oggi? (PROTOTIPO 2, Blocco 9, Gruppo A, "allenamenti_giorno=2",
+  // Predestinato): confronta quanti se ne sono gia' fatti oggi (care.allenamentiFattiOggi,
+  // che azzera da solo a cambio data) col massimo concesso dai talenti attivi (default 1).
+  function allenamentoEsauritoOggi(state) {
+    var fatti = (PETQ.care && PETQ.care.allenamentiFattiOggi) ? PETQ.care.allenamentiFattiOggi(state) : (state.trainDay === oggiStr() ? 1 : 0);
+    var max = (PETQ.talenti && PETQ.talenti.allenamentiPerGiorno) ? PETQ.talenti.allenamentiPerGiorno(state) : 1;
+    return fatti >= max;
+  }
+
   function avviaAllenamento(prop, cardEl) {
     if (animazioneInCorso) return;
     annullaIdleAction();
-    if (currentState.trainDay === oggiStr()) {
+    if (allenamentoEsauritoOggi(currentState)) {
       mostraToast('Allenamento già fatto oggi.');
       return;
     }
@@ -1849,7 +1858,11 @@ window.PETQ = window.PETQ || {};
     for (var i = 0; i < dispensa.length; i++) {
       (function (voce, idx) {
         var cibo = trovaCibo(voce.nome) || ciboFallback(voce.nome);
-        var card = el('div', 'petq-food-card petq-food-card-dispensa');
+        // Talenti (PROTOTIPO 2, Blocco 9, Gruppo A, "blocca_cibo=dolce", Fissato con la
+        // Dieta): la card appare disabilitata con il motivo, invece di lasciar provare e
+        // rifiutare al tap/drag (care.feed comunque rifiuta lato dati, questa e' solo UX).
+        var bloccato = PETQ.talenti && PETQ.talenti.ciboBloccato && PETQ.talenti.ciboBloccato(currentState, cibo.categoria);
+        var card = el('div', 'petq-food-card petq-food-card-dispensa' + (bloccato ? ' petq-food-card-bloccata' : ''));
 
         var icona = document.createElement('canvas');
         icona.width = 12; icona.height = 12;
@@ -1861,6 +1874,15 @@ window.PETQ = window.PETQ || {};
         card.appendChild(el('div', 'petq-food-tag', 'x' + (voce.qty || 0)));
         var effettiEl = el('div', 'petq-food-costo', descriviCibo(cibo));
         card.appendChild(effettiEl);
+
+        if (bloccato) {
+          var motivoBlocco = 'Il talento Fissato con la Dieta non tocca i dolci';
+          card.title = motivoBlocco;
+          card.appendChild(el('div', 'petq-food-bloccata-hint', motivoBlocco));
+          card.addEventListener('click', function () { mostraToast(motivoBlocco + '.'); });
+          lista.appendChild(card);
+          return;
+        }
 
         card.addEventListener('click', function () {
           if (!foodPointer) eseguiFeed(cibo, card, idx);
@@ -2100,12 +2122,15 @@ window.PETQ = window.PETQ || {};
       return;
     }
 
-    var giaAllenato = currentState.trainDay === oggi;
+    // Talenti (Gruppo A, "allenamenti_giorno=2", Predestinato): il limite giornaliero non e'
+    // piu' sempre 1, v. allenamentoEsauritoOggi sopra.
+    var giaAllenato = allenamentoEsauritoOggi(currentState);
+    var maxAllenamentiGiorno = (PETQ.talenti && PETQ.talenti.allenamentiPerGiorno) ? PETQ.talenti.allenamentiPerGiorno(currentState) : 1;
     var cardsDisabilitate = giaAllenato || inMissione;
 
     var hintSalone = inMissione
       ? nome + ' è in missione. Intanto puoi sistemare la collezione.'
-      : 'Tocca ' + nome + ' per una coccola. Allenamento (1 al giorno):';
+      : 'Tocca ' + nome + ' per una coccola. Allenamento (' + maxAllenamentiGiorno + ' al giorno):';
     container.appendChild(el('p', 'petq-hint', hintSalone));
 
     var cards = el('div', 'petq-train-cards');
@@ -2124,7 +2149,7 @@ window.PETQ = window.PETQ || {};
         card.appendChild(el('div', 'petq-train-val', testoStat(prop.stat)));
 
         card.addEventListener('click', function () {
-          if (currentState.trainDay === oggiStr() || currentState.missione || currentState.allenamento) return;
+          if (allenamentoEsauritoOggi(currentState) || currentState.missione || currentState.allenamento) return;
           avviaAllenamento(prop, card);
         });
         cards.appendChild(card);
@@ -2153,6 +2178,31 @@ window.PETQ = window.PETQ || {};
     });
     paroleWrap.appendChild(paroleBtn);
     container.appendChild(paroleWrap);
+
+    // "Studio veloce" (PROTOTIPO 2, Blocco 9, Gruppo A, talento Nerd "Sete di Sapere"):
+    // bottone visibile SOLO se il pet ha questo talento attivo, azione istantanea (niente
+    // animazione a tempo, non tocca state.allenamento/trainCount), 1 al giorno.
+    var statStudioVeloce = (PETQ.talenti && PETQ.talenti.allenamentoExtraStat) ? PETQ.talenti.allenamentoExtraStat(currentState) : null;
+    if (statStudioVeloce) {
+      var studioWrap = el('div', 'petq-riga-azione');
+      var giaStudiato = currentState.studioVeloceDay === oggi;
+      var studioBtn = el('button', 'petq-btn petq-btn-piccolo', 'Studio veloce (+1 ' + (STAT_LABEL[statStudioVeloce] || statStudioVeloce) + ')');
+      if (giaStudiato || inMissione) {
+        studioBtn.disabled = true;
+        studioBtn.title = giaStudiato ? 'Studio veloce già fatto oggi' : nome + ' è in missione';
+      }
+      studioBtn.addEventListener('click', function () {
+        var r = PETQ.care.studioVeloce(currentState);
+        if (!r.ok) {
+          mostraToast(r.msg);
+          renderAzioni();
+          return;
+        }
+        dopoAzione(r);
+      });
+      studioWrap.appendChild(studioBtn);
+      container.appendChild(studioWrap);
+    }
 
     // collezione arredi
     var collBtn = el('button', 'petq-btn', collezioneAperta ? 'Chiudi collezione' : 'Collezione');
@@ -3244,6 +3294,8 @@ window.PETQ = window.PETQ || {};
       if (!currentState) return;
       currentState.missioneGiorno = null;
       currentState.trainDay = null;
+      currentState.trainCount = 0;
+      currentState.studioVeloceDay = null;
       currentState.wordDay = null;
       currentState.coccoleDay = null;
       currentState.coccoleCount = 0;

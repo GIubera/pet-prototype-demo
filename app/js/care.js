@@ -62,6 +62,14 @@ window.PETQ = window.PETQ || {};
   function feed(state, cibo) {
     if (!state || !state.pet || !cibo) return { ok: false, msg: 'errore interno' };
 
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo A, "Fissato con la Dieta"): blocca_cibo=dolce
+    // impedisce di somministrare quella categoria. Controllato PRIMA di consumare dalla
+    // dispensa: il pasto va rifiutato, non "sprecato" (v. anche renderAzioniCucina in ui.js,
+    // che disabilita gia' la card nel frigo con lo stesso motivo).
+    if (PETQ.talenti && PETQ.talenti.ciboBloccato && PETQ.talenti.ciboBloccato(state, cibo.categoria)) {
+      return { ok: false, msg: 'Il talento Fissato con la Dieta non tocca i dolci.' };
+    }
+
     if (!consumaDaDispensa(state, cibo.nome)) {
       return { ok: false, msg: 'Non ne hai in frigo: compralo al Negozio.' };
     }
@@ -73,11 +81,17 @@ window.PETQ = window.PETQ || {};
     // Pacing stat RPG (bilanciamento.md): il bonus stat del cibo scatta solo per il PRIMO
     // pasto del giorno di quella categoria (la dieta varia premia, lo spam no). Il bonus
     // fame invece si applica sempre (comportamento invariato, vedi sopra).
+    // Talenti (Gruppo A, "bonus_cibo=<categoria>:+1stat"/"bonus_cibo=salutare:+1stat", es.
+    // Braccia di Ferro/Amante della Natura/Fissato con la Dieta): l'EXTRA si applica SOLO
+    // quando scatta anche il bonus base (stessa guardia primaVoltaOggi), mai in spam — v.
+    // talenti.js bonusCiboExtra per il dettaglio del design.
     if (!Array.isArray(state.categoriePastiOggi)) state.categoriePastiOggi = [];
     var primaVoltaOggi = cibo.categoria && state.categoriePastiOggi.indexOf(cibo.categoria) === -1;
     if (primaVoltaOggi) {
       if (cibo.statNome && pet.rpg && typeof pet.rpg[cibo.statNome] === 'number') {
-        pet.rpg[cibo.statNome] += (cibo.stat || 0);
+        var extraTalento = (PETQ.talenti && PETQ.talenti.bonusCiboExtra) ?
+          PETQ.talenti.bonusCiboExtra(state, cibo.categoria) : 0;
+        pet.rpg[cibo.statNome] += (cibo.stat || 0) + extraTalento;
       }
       state.categoriePastiOggi.push(cibo.categoria);
     }
@@ -167,9 +181,20 @@ window.PETQ = window.PETQ || {};
   // applica piu' subito l'effetto: AVVIA l'attivita' (state.allenamento), l'effetto/felicita'/
   // costo energia si applicano al COMPLETAMENTO (v. pet.js controllaAllenamentoScaduto), per
   // coerenza con "il pet e' occupato mentre si allena" (a differenza del vecchio salto secco).
-  // trainDay si marca gia' QUI, all'AVVIO (non al completamento): impedisce di avviarne un
-  // secondo lo stesso giorno anche se il primo e' ancora in corso a cavallo di mezzanotte.
+  //
+  // Talenti (PROTOTIPO 2, Blocco 9, Gruppo A): state.trainDay resta la data dell'ULTIMO
+  // allenamento avviato (serve a sapere quando azzerare il contatore sotto e resta letto da
+  // ui.js per l'hint "gia' fatto oggi" nel caso comune di 1/giorno); state.trainCount conta
+  // quanti allenamenti sono stati AVVIATI oggi, confrontato con
+  // PETQ.talenti.allenamentiPerGiorno(state) (default 1, 2 con "Predestinato"). Marcati
+  // all'AVVIO (non al completamento), stesso principio di prima: niente secondo avvio oltre il
+  // limite anche se il primo e' ancora "in corso" a cavallo di mezzanotte.
   var DURATA_ALLENAMENTO_ORE = 1.5;
+
+  function allenamentiFattiOggi(state) {
+    if (!state) return 0;
+    return (state.trainDay === oggiStr()) ? (state.trainCount || 0) : 0;
+  }
 
   function train(state, statNome) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
@@ -180,20 +205,29 @@ window.PETQ = window.PETQ || {};
       return { ok: false, msg: (state.pet.nome || 'Il pet') + ' si sta gia\' allenando.' };
     }
     var oggi = oggiStr();
-    if (state.trainDay === oggi) {
+    var maxGiorno = (PETQ.talenti && PETQ.talenti.allenamentiPerGiorno) ?
+      PETQ.talenti.allenamentiPerGiorno(state) : 1;
+    if (allenamentiFattiOggi(state) >= maxGiorno) {
       return { ok: false, msg: 'Allenamento già fatto oggi.' };
     }
     if (!state.pet.rpg || typeof state.pet.rpg[statNome] !== 'number') {
       return { ok: false, msg: 'Statistica non valida.' };
     }
-    if (PETQ.pet.energiaSottoSoglia(state.pet)) {
+    var ignoraEnergia = PETQ.talenti && PETQ.talenti.ignoraRifiutoEnergia && PETQ.talenti.ignoraRifiutoEnergia(state);
+    if (!ignoraEnergia && PETQ.pet.energiaSottoSoglia(state.pet)) {
       return { ok: false, msg: 'Troppo stanco per allenarsi.', battutaPool: 'sonno' };
     }
 
-    // Marcato all'AVVIO (non al completamento): un solo allenamento al giorno, niente secondo
-    // avvio finche' non cambia data, anche se il primo e' ancora "in corso".
-    state.trainDay = oggi;
-    state.allenamento = { stat: statNome, oreFatte: 0, oreTot: DURATA_ALLENAMENTO_ORE };
+    // Marcato all'AVVIO (non al completamento).
+    if (state.trainDay !== oggi) {
+      state.trainDay = oggi;
+      state.trainCount = 0;
+    }
+    state.trainCount = (state.trainCount || 0) + 1;
+
+    var durataMult = (PETQ.talenti && PETQ.talenti.durataAllenamentoMult) ?
+      PETQ.talenti.durataAllenamentoMult(state) : 1;
+    state.allenamento = { stat: statNome, oreFatte: 0, oreTot: DURATA_ALLENAMENTO_ORE * durataMult };
 
     return {
       ok: true,
@@ -202,10 +236,10 @@ window.PETQ = window.PETQ || {};
     };
   }
 
-  // Completa l'allenamento in corso: applica effetto stat (+ bonus arredi), felicita' bonus e
-  // costo energia (v. bilanciamento.md "Allenamento"/"Energia e sonno"), poi azzera
-  // state.allenamento. Va richiamata SOLO quando oreFatte >= oreTot (v. pet.js
-  // controllaAllenamentoScaduto, stesso pattern di risolviRisveglio/missions.risolvi: il
+  // Completa l'allenamento in corso: applica effetto stat (+ bonus arredi + bonus talenti),
+  // felicita' bonus e costo/guadagno energia (v. bilanciamento.md "Allenamento"/"Energia e
+  // sonno"), poi azzera state.allenamento. Va richiamata SOLO quando oreFatte >= oreTot (v.
+  // pet.js controllaAllenamentoScaduto, stesso pattern di risolviRisveglio/missions.risolvi: il
   // "quando" lo decide il chiamante, questa funzione applica sempre se c'e' un'attivita' attiva).
   function completaAllenamento(state) {
     if (!state || !state.pet || !state.allenamento) return { ok: false, msg: 'Nessun allenamento in corso.' };
@@ -220,18 +254,53 @@ window.PETQ = window.PETQ || {};
       effetto += PETQ.arredi.bonusAllenamento(state, statNome);
     }
 
+    // Talenti (Gruppo A, "bonus_allenamento=<stat>:+N" / "bonus_allenamento=qualsiasi:<stat>+N",
+    // es. Braccia di Ferro/Mente Analitica): extra per-stat, sommato DOPO l'arredo cosi' finisce
+    // sempre nello stesso numero mostrato in "Allenamento finito: +N". Puo' toccare stat DIVERSE
+    // da quella allenata (Mente Analitica da' +1 Int allenando qualsiasi cosa): applichiamo la
+    // stat allenata con `effetto` (base+arredi+extra-stessa-stat) e le eventuali stat extra
+    // diverse separatamente.
+    var extraPerStat = { forza: 0, intelligenza: 0, velocita: 0, carisma: 0 };
+    if (PETQ.talenti && PETQ.talenti.bonusAllenamentoExtra) {
+      extraPerStat = PETQ.talenti.bonusAllenamentoExtra(state, statNome);
+    }
+    effetto += extraPerStat[statNome] || 0;
+
     if (state.pet.rpg && typeof state.pet.rpg[statNome] === 'number') {
       state.pet.rpg[statNome] += effetto;
     }
+    var extraAltreStat = [];
+    for (var k in extraPerStat) {
+      if (!Object.prototype.hasOwnProperty.call(extraPerStat, k)) continue;
+      if (k === statNome) continue; // gia' incluso in `effetto` sopra
+      if (extraPerStat[k] > 0 && state.pet.rpg && typeof state.pet.rpg[k] === 'number') {
+        state.pet.rpg[k] += extraPerStat[k];
+        extraAltreStat.push('+' + extraPerStat[k] + ' ' + STAT_LABEL_TRAIN[k]);
+      }
+    }
+
     state.pet.stats.felicita = clamp(state.pet.stats.felicita + felicitaBonus, 0, 100);
-    state.pet.stats.energia = clamp(state.pet.stats.energia - es.costoAllenamento, 0, 100);
+
+    // Talenti (Gruppo A, "allenamento_energia=+N", Energico): l'allenamento DA' energia invece
+    // di toglierla. energiaAllenamentoOverride ritorna il delta gia' col segno giusto (es. +5),
+    // il chiamante lo SOMMA invece di sottrarre il costo normale.
+    var overrideEnergia = (PETQ.talenti && PETQ.talenti.energiaAllenamentoOverride) ?
+      PETQ.talenti.energiaAllenamentoOverride(state) : null;
+    if (overrideEnergia !== null) {
+      state.pet.stats.energia = clamp(state.pet.stats.energia + overrideEnergia, 0, 100);
+    } else {
+      state.pet.stats.energia = clamp(state.pet.stats.energia - es.costoAllenamento, 0, 100);
+    }
 
     state.allenamento = null;
     PETQ.pet.recomputeSalute(state.pet, state);
 
+    var msg = 'Allenamento finito: +' + effetto + ' ' + STAT_LABEL_TRAIN[statNome] + '!';
+    if (extraAltreStat.length > 0) msg += ' (' + extraAltreStat.join(', ') + ')';
+
     return {
       ok: true,
-      msg: 'Allenamento finito: +' + effetto + ' ' + STAT_LABEL_TRAIN[statNome] + '!',
+      msg: msg,
       stat: statNome,
       effetto: effetto
     };
@@ -260,6 +329,43 @@ window.PETQ = window.PETQ || {};
     PETQ.pet.recomputeSalute(state.pet, state);
 
     return { ok: true, msg: (state.pet.nome || 'Il pet') + ' ha imparato: ' + pulita + '.' };
+  }
+
+  // "Studio veloce" (PROTOTIPO 2, Blocco 9, Gruppo A, talento Nerd "Sete di Sapere",
+  // allenamento_extra=int): +1 Intelligenza ISTANTANEO, 1/giorno, che NON consuma il turno di
+  // allenamento normale (state.allenamento resta libero, trainCount non si tocca). Traccia il
+  // giorno in state.studioVeloceDay, stesso pattern di wordDay/trainDay. Visibile in UI SOLO se
+  // il pet ha il talento (v. ui.js renderAzioniSalone, controllo su
+  // PETQ.talenti.allenamentoExtraStat).
+  function studioVeloce(state) {
+    if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
+    var statExtra = (PETQ.talenti && PETQ.talenti.allenamentoExtraStat) ? PETQ.talenti.allenamentoExtraStat(state) : null;
+    if (!statExtra) {
+      return { ok: false, msg: 'Nessun talento di studio veloce attivo.' };
+    }
+    if (state.sonno) {
+      return { ok: false, msg: (state.pet.nome || 'Il pet') + ' sta dormendo.' };
+    }
+    if (state.missione) {
+      return { ok: false, msg: (state.pet.nome || 'Il pet') + ' è in missione.' };
+    }
+    var oggi = oggiStr();
+    if (state.studioVeloceDay === oggi) {
+      return { ok: false, msg: 'Studio veloce già fatto oggi, torna domani.' };
+    }
+    if (!state.pet.rpg || typeof state.pet.rpg[statExtra] !== 'number') {
+      return { ok: false, msg: 'Statistica non valida.' };
+    }
+
+    state.studioVeloceDay = oggi;
+    state.pet.rpg[statExtra] += 1;
+    PETQ.pet.recomputeSalute(state.pet, state);
+
+    return {
+      ok: true,
+      msg: (state.pet.nome || 'Il pet') + ' fa uno studio veloce: +1 ' + (STAT_LABEL_TRAIN[statExtra] || statExtra) + '!',
+      stat: statExtra
+    };
   }
 
   function dailyLogin(state) {
@@ -351,6 +457,8 @@ window.PETQ = window.PETQ || {};
     coccola: coccola,
     train: train,
     completaAllenamento: completaAllenamento,
+    allenamentiFattiOggi: allenamentiFattiOggi,
+    studioVeloce: studioVeloce,
     teachWord: teachWord,
     dailyLogin: dailyLogin,
     cura: cura,

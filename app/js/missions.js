@@ -336,7 +336,10 @@ window.PETQ = window.PETQ || {};
     if (state.allenamento) {
       return { ok: false, msg: (state.pet && state.pet.nome ? state.pet.nome : 'Il pet') + ' si sta allenando.' };
     }
-    if (PETQ.pet && PETQ.pet.energiaSottoSoglia && PETQ.pet.energiaSottoSoglia(state.pet)) {
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo A, "ignora_rifiuto_energia", Fisico Bestiale):
+    // niente rifiuto missione per Energia bassa, stessa guardia usata in care.train.
+    var ignoraEnergiaMissione = PETQ.talenti && PETQ.talenti.ignoraRifiutoEnergia && PETQ.talenti.ignoraRifiutoEnergia(state);
+    if (!ignoraEnergiaMissione && PETQ.pet && PETQ.pet.energiaSottoSoglia && PETQ.pet.energiaSottoSoglia(state.pet)) {
       return { ok: false, msg: 'Troppo stanco per partire in missione.', battutaPool: 'sonno' };
     }
     var costo = scheda.costo || 0;

@@ -216,7 +216,13 @@ window.PETQ = window.PETQ || {};
     pet.stats.igiene = clamp(pet.stats.igiene - dec.igiene * gameHours, 0, 100);
 
     if (typeof pet.stats.energia !== 'number') pet.stats.energia = 70;
-    pet.stats.energia = clamp(pet.stats.energia - es.decadimento * gameHours, 0, 100);
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo A, "energia_decay=x0.5", Energico): moltiplicatore
+    // sul decadimento Energia, letto a runtime dai talenti del pet (1 se nessuno lo tocca).
+    // applyDecay riceve `state` solo come parametro opzionale (v. firma sopra: alcuni chiamanti
+    // storici passano solo `pet`), quindi la guardia su state e' necessaria.
+    var decayMult = (state && PETQ.talenti && PETQ.talenti.energiaDecayMult) ?
+      PETQ.talenti.energiaDecayMult(state) : 1;
+    pet.stats.energia = clamp(pet.stats.energia - es.decadimento * gameHours * decayMult, 0, 100);
 
     var calofelicita = dec.felicita * gameHours;
     if (pet.stats.fame < soglie.critica || pet.stats.igiene < soglie.critica) {

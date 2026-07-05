@@ -808,6 +808,22 @@ button {
   border: 1px dashed #7fd8a4;
 }
 
+/* Talenti (PROTOTIPO 2, Blocco 9, Gruppo A, "blocca_cibo=dolce", Fissato con la Dieta): card
+   cibo disabilitata nel frigo con il motivo, invece di lasciar provare e rifiutare al tap. */
+.petq-food-card-bloccata {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e08a8a;
+}
+
+.petq-food-bloccata-hint {
+  font-size: 8px;
+  color: #e08a8a;
+  text-align: center;
+  line-height: 1.15;
+  pointer-events: none;
+}
+
 .petq-food-tag {
   font-size: 9px;
   text-transform: uppercase;
