@@ -1,10 +1,10 @@
-# Missioni — prototipo (12 schede + tutorial)
+# Missioni — prototipo (16 schede + tutorial)
 
 Chi compila: il fondatore definisce le schede (requisiti, durata, reward, condizioni); il socio scrive i testi degli esiti (qui in versione neutra, poi le varianti per personalità). Ogni scheda ha anche una riga "Scena" per chi disegnerà gli sprite di ogni esito.
 
 **Modello di risoluzione (pet baby, prototipo)** — niente tiro di dado, niente soglia probabilistica. Il giocatore sceglie 1 missione al giorno da una rosa di 3; quasi sempre l'esito è quello **standard** (è così che il pet cresce, punto). Fallimento e super successo sono code rare, deterministiche: scattano solo se il pet soddisfa la condizione scritta sulla scheda (di solito una personalità precisa, a volte insieme a una stat molto bassa/alta). Il fallimento non è mai un "meno secco": compensa sempre con qualcosa, possibilmente in tema con la missione. Dettagli del modello e vecchia formula probabilistica (fase adulta) in bilanciamento.md.
 
-**Categorie, tag & perk**: ogni missione ha una categoria (Videogioco, Sociale, Combattimento, Studio, Consegne, Sport) e opzionalmente uno o più **tag** trasversali (invenzione, natura, gara) usati dai talenti e da alcuni perk. Alcuni super successi sbloccano un **perk**: un arredo che, finché è piazzato in casa, annulla il fallimento e garantisce sempre il super successo nelle missioni future della stessa categoria — o dello stesso tag, come Sabotatore sulle gare senza perk proprio.
+**Categorie, tag & perk**: ogni missione ha una categoria (Videogioco, Sociale, Combattimento, Studio, Consegne, Sport, Lavoretti) e opzionalmente uno o più **tag** trasversali (invenzione, natura, gara, inseguimento) usati dai talenti e da alcuni perk. Alcuni super successi sbloccano un **perk**: un arredo che, finché è piazzato in casa, annulla il fallimento e garantisce sempre il super successo nelle missioni future della stessa categoria — o dello stesso tag, come Sabotatore sulle gare senza perk proprio.
 
 ---
 
@@ -356,6 +356,123 @@ Dati: cond= int>=3 ; reward= int+2, monete+15, arredo:Pianta Esotica
 Testo: "Non solo impari le regole della serra — le riscrivi. Capisci al volo cosa vuole ogni pianta, ne fai fiorire una che il giardiniere non vedeva sbocciare da anni, e lui, con le lacrime agli occhi, ti affida il suo esemplare più prezioso: una pianta esotica dai poteri imprevedibili, che ogni giorno regala energie diverse a chi le sta vicino."
 Scena: [DEDICATA] pet che regge con orgoglio una pianta esotica luminosa e pulsante di colori, il giardiniere commosso sullo sfondo — mood magico
 
+## Missione 13: Braccio di Ferro al Bar dei Bulloni
+- Luogo: 📍 Bar dei Bulloni
+- Razza: entrambe
+- Categoria: Combattimento
+- Stat coinvolta: Forza
+- Tag: gara
+- Durata: 2h
+- Costo: gratis
+- Dati: durata=2h ; costo=0 ; categoria=combattimento ; stat=forza ; tag=gara
+
+**Standard** — +1 Forza, +8 monete, Trofeo Braccio di Ferro (arredo, +1 Forza passivo)
+Dati: reward= forza+1, monete+8, arredo:Trofeo Braccio di Ferro
+Testo: "Il Bar dei Bulloni è pieno di energumeni che si stringono la mano come per spezzarla. Ti siedi al tavolo, gomito piantato, e con una spinta secca metti giù il primo sfidante. Applausi, una bibita alla spina e un trofeo di latta."
+Scena: pet al tavolo che atterra il braccio di un energumeno, folla di bestioni intorno
+
+**Fallimento** (condizione: Gentile + Forza ≤1) — +1 Carisma, Spiedino (cibo Forza+1)
+Dati: priorita=1 ; cond= gentile & forza<=1 ; reward= carisma+1, cibo:Spiedino
+Testo: "Non hai la stazza per vincere, ma hai il sorriso giusto: invece di prenderle, finisci a ridere e scherzare coi bestioni, che ti adottano come mascotte del bancone."
+Scena: pet minuto che ride tra energumeni sorridenti
+
+**Fallimento** (condizione: Forza ≤1) — Ferite +10, Bistecca (cibo Forza+2)
+Dati: priorita=2 ; cond= forza<=1 ; reward= ferite+10, cibo:Bistecca
+Testo: "Il tuo gomito tocca il tavolo in mezzo secondo netto, e ti porti a casa un braccio indolenzito. Gli energumeni, tra una risata e l'altra, ti rifilano una bella bistecca: 'mangia, gambo di sedano'."
+Scena: pet col braccio indolenzito, un bestione che gli porge un piatto di carne
+
+**Super successo** (condizione: Forza 3+, o auto col perk Sabotatore via tag gara) — +2 Forza, +12 monete, Trofeo d'Oro Braccio di Ferro (arredo raro, +1 Forza passivo + perk Popeye: mangiando verdure prende anche +1 Forza)
+Dati: cond= forza>=3 ; reward= forza+2, monete+12, arredo:Trofeo d'Oro Braccio di Ferro, perk:popeye
+Testo: "Li metti giù tutti, uno dopo l'altro, senza scomporti. Il bar intero scandisce il tuo nome, e il gestore stacca dal muro il trofeo d'oro riservato ai leggendari."
+Scena: [DEDICATA] pet che alza il trofeo d'oro, energumeni sconfitti a bocca aperta
+
+## Missione 14: Trasloco del Sesto Piano
+- Luogo: 📍 Palazzo senza Ascensore
+- Razza: entrambe
+- Categoria: Lavoretti
+- Stat coinvolta: Forza
+- Durata: 3h
+- Costo: gratis
+- Dati: durata=3h ; costo=0 ; categoria=lavoretti ; stat=forza
+
+**Standard** — +1 Forza, +15 monete, −8 Igiene
+Dati: reward= forza+1, monete+15, igiene-8
+Testo: "Sei rampe, niente ascensore, e un armadio a quattro ante che pesa quanto te. Su e giù fino a sera: le braccia bruciano, ma il trasloco è finito e il portafoglio ringrazia. Peccato per la polvere ovunque."
+Scena: pet che porta un armadio enorme su per le scale, sudato
+
+**Fallimento** (condizione: Maleducato) — Arrosto (cibo multi-porzione: 3 fette, ogni fetta Forza+1)
+Dati: priorita=1 ; cond= maleducato ; reward= cibo:Arrosto
+Testo: "Dopo due ordini di troppo del capocantiere, molli tutto a metà scala. Ma già che sei in giro per l'edificio, ti 'prendi in prestito' un arrosto intero da una cucina lasciata aperta."
+Scena: pet che se ne va spallucciando con un arrosto fumante sottobraccio
+
+**Fallimento** (condizione: Forza ≤1) — +6 monete, Barretta proteica (cibo Forza+1)
+Dati: priorita=2 ; cond= forza<=1 ; reward= monete+6, cibo:Barretta proteica
+Testo: "Al terzo viaggio le gambe dicono basta. Il capo ti liquida con metà paga e una barretta proteica: 'allenati e torna'."
+Scena: pet accasciato sui gradini con una scatola mollata a terra
+
+**Super successo** (condizione: Nerd + talento Inventore) — +2 Forza, +20 monete, Targa Traslocatore dell'Anno (arredo, +1 Forza passivo), 0 energia consumata e niente −Igiene (monti un montacarichi)
+Dati: priorita=1 ; cond= nerd & talento:inventore ; reward= forza+2, monete+20, arredo:Targa Traslocatore dell'Anno, energiaMissione=0
+Testo: "Invece di sfiancarti, in un'ora monti un montacarichi con corde e carrucole: il lavoro lo fa la fisica. Stessa targa, stessa paga, zero fatica — e mani pulite."
+Scena: [DEDICATA] pet soddisfatto accanto a un montacarichi rustico che solleva i mobili
+
+**Super successo** (condizione: Forza 3+) — +2 Forza, +20 monete, −8 Igiene, Targa Traslocatore dell'Anno (arredo, +1 Forza passivo)
+Dati: priorita=2 ; cond= forza>=3 ; reward= forza+2, monete+20, igiene-8, arredo:Targa Traslocatore dell'Anno
+Testo: "Carichi due scatoloni per mano e voli su e giù per le scale come se fossero piatte. Finisci in metà tempo e il capo ti consegna la targa 'Traslocatore dell'Anno'."
+Scena: [DEDICATA] pet trionfante con la targa, pila di scatoloni sistemati dietro
+
+Priorità M14: la via Nerd+Inventore (montacarichi, 0 energia) batte il super generico Forza 3+.
+
+## Missione 15: Acchiappa lo Scippatore
+- Luogo: 📍 Vicoli del Centro
+- Razza: entrambe
+- Categoria: Lavoretti
+- Stat coinvolta: Velocità
+- Tag: inseguimento
+- Durata: 1h
+- Costo: gratis
+- Dati: durata=1h ; costo=0 ; categoria=lavoretti ; stat=velocita ; tag=inseguimento
+
+**Standard** — +1 Velocità, +10 monete, Paperella a Reazione (arredo bagno, +1 Velocità passivo)
+Dati: reward= velocita+1, monete+10, arredo:Paperella a Reazione
+Testo: "Uno scippatore ti sfreccia accanto col bottino di qualcuno. Parti in quarta, lo insegui tra i vicoli e lo placchi contro un cassonetto. Il derubato ti ricompensa, e nella borsa recuperata c'è pure una paperella a reazione."
+Scena: pet in corsa che placca uno scippatore, borsa che vola
+
+**Fallimento** (condizione: Velocità ≤1) — Sushi (cibo Velocità+2)
+Dati: cond= velocita<=1 ; reward= cibo:Sushi
+Testo: "Parte come un razzo e tu... no. Lo perdi al primo angolo. I vicini, che hanno visto il tentativo, ti consolano con del sushi fresco."
+Scena: pet piegato in due col fiatone, lo scippatore lontano
+
+**Super successo** (condizione: Velocità 3+, oppure Sportivo + talento Energico) — +2 Velocità, +15 monete, Scarpe da Parkour (arredo, +1 Velocità passivo + perk Parkour Master: auto-super nelle missioni tag inseguimento)
+Dati: cond= velocita>=3 | (sportivo & talento:energico) ; reward= velocita+2, monete+15, arredo:Scarpe da Parkour, perk:parkour
+Testo: "Non solo lo prendi — lo fai rimbalzando su muri, scale e tettoie come se la città fosse una pista da parkour. Ti restano addosso un paio di scarpe leggendarie e la fama di chi in strada non lo prende nessuno."
+Scena: [DEDICATA] pet a mezz'aria tra due muri in posa da parkour, scippatore braccato sotto
+
+## Missione 16: Cattura Pesci a Mani Nude
+- Luogo: 📍 Acquario Comunale (Vasche Rotte)
+- Razza: entrambe
+- Categoria: Lavoretti
+- Stat coinvolta: Velocità
+- Tag: natura
+- Durata: 3h
+- Costo: gratis
+- Nota: missione volutamente difficile (super a Velocità 4+)
+- Dati: durata=3h ; costo=0 ; categoria=lavoretti ; stat=velocita ; tag=natura
+
+**Standard** — +2 Velocità, +10 monete, Acquario di Casa (arredo camera, +1 Velocità +1 Felicità passivo)
+Dati: reward= velocita+2, monete+10, arredo:Acquario di Casa
+Testo: "Le vasche dell'acquario si sono rotte e i pesci guizzano ovunque sul pavimento allagato. Li rincorri per ore, scivolando e riacchiappandoli a mani nude. Ne salvi un bel po', ti paghi il disturbo e ne tieni uno in una boccia."
+Scena: pet che si tuffa per acchiappare pesci guizzanti in una sala allagata
+
+**Fallimento** (condizione: Velocità ≤1, oppure Nerd + talento Idrofobico) — +4 monete, +1 Velocità, niente acquario
+Dati: cond= velocita<=1 | (nerd & talento:idrofobico) ; reward= monete+4, velocita+1
+Testo: "Sei lento, l'acqua ti fa ribrezzo, e i pesci sono più svelti di te. Ne prendi giusto un paio dopo un'eternità: poca paga, niente acquario. Almeno hai le idee più chiare su come si fa."
+Scena: pet fradicio e sconsolato con due pesciolini in mano
+
+**Super successo** (condizione: Velocità 4+, o auto col talento Amante della Natura via tag natura) — +3 Velocità, +20 monete, Acquario di Casa (arredo camera, +1 Velocità +1 Felicità passivo)
+Dati: cond= velocita>=4 ; reward= velocita+3, monete+20, arredo:Acquario di Casa
+Testo: "Ti muovi tra le pozze come un fulmine (o, se sei un tipo gentile, convinci i pesci a saltarti dritti in mano). Li salvi tutti, l'acquario ti riempie il portafoglio e ti regala l'esemplare più bello."
+Scena: [DEDICATA] pet che afferra al volo tre pesci in un tuffo spettacolare, spruzzi ovunque
+
 ---
 
 ## Backlog — concetti sviluppati ma non scelti (da riprendere in una sessione futura)
@@ -374,8 +491,8 @@ Scena: [DEDICATA] pet che regge con orgoglio una pianta esotica luminosa e pulsa
 
 ---
 
-## Linee guida di progetto (dal GDD, verificate su queste 12 schede)
-- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8), Carisma (M2, M6, M11), Forza (M3, M5, M7), Intelligenza (M4, M9, M10, M12) ✓
+## Linee guida di progetto (dal GDD, verificate su queste 16 schede)
+- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8, M15, M16), Carisma (M2, M6, M11), Forza (M3, M5, M7, M13, M14), Intelligenza (M4, M9, M10, M12) ✓
 - Durate tra 1 e 6 ore reali, con una corta ~1h (M1) ✓
 - Reward misti: monete, cibo, arredi, XP stat — mai solo monete ✓
 - Rischio igiene (M5) e salute (M3, M7) per far girare la loop di cura ✓

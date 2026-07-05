@@ -51,8 +51,14 @@ Bozza di struttura con esempi di Claude, lista definitiva da fare in sessione de
 | Gattino Robot | camera | entrambe | rara | drop missione rara (M11 super successo) | +1 Carisma passiva |
 | Manuale di Botanica | camera | entrambe | comune | drop missione (M12 fallimento) | +1 Intelligenza passiva |
 | Pianta Esotica | ovunque | entrambe | rara | drop missione rara (M12 super successo) | +2 a una stat RPG casuale ogni giorno (passivo, ri-estratta ogni giorno, non si accumula) |
+| Trofeo Braccio di Ferro | salone | entrambe | comune | drop missione (M13 standard) | +1 Forza passiva |
+| Trofeo d'Oro Braccio di Ferro | salone | entrambe | rara | drop missione rara (M13 super successo) | +1 Forza passiva + perk Popeye (mangiando verdure: anche +1 Forza) |
+| Targa Traslocatore dell'Anno | salone | entrambe | comune | drop missione (M14 super successo) | +1 Forza passiva |
+| Paperella a Reazione | bagno | entrambe | comune | drop missione (M15 standard) | +1 Velocità passiva |
+| Scarpe da Parkour | camera | entrambe | rara | drop missione rara (M15 super successo) | +1 Velocità passiva + perk Parkour Master |
+| Acquario di Casa | camera | entrambe | comune | drop missione (M16 standard/super) | +1 Velocità + +1 Felicità passiva |
 
-Stanza assegnata per tema (PROTOTIPO 2, Blocco 7 — collectables in tutte le stanze): cibo/elettrodomestici → cucina (Frigo nuovo, Braccio meccanico da banco, Distributore di croccantini), accessori bagno → bagno (Vasca idromassaggio, Ombrello meccanico), relax/notte/lettura/cuccioli → camera (Lampada da terra, Poster motivazionale, Piantina strana, Album da disegno, Libro, Coppa Robot Wars, Mecha-Bot, Cuccia, Gattino Robot, Manuale di Botanica), trofei/giochi/armi/sport → salone (il resto). La Pianta Esotica (M12 super) è l'unico arredo mettibile in QUALSIASI stanza. Ogni stanza ha 3 slot con supporti dedicati (v. rooms.js _slotSpots/_slotTipi). Da rifinire in sessione design se servono ribilanciamenti.
+Stanza assegnata per tema (PROTOTIPO 2, Blocco 7 — collectables in tutte le stanze): cibo/elettrodomestici → cucina (Frigo nuovo, Braccio meccanico da banco, Distributore di croccantini), accessori bagno → bagno (Vasca idromassaggio, Ombrello meccanico, Paperella a Reazione), relax/notte/lettura/cuccioli → camera (Lampada da terra, Poster motivazionale, Piantina strana, Album da disegno, Libro, Coppa Robot Wars, Mecha-Bot, Cuccia, Gattino Robot, Manuale di Botanica, Scarpe da Parkour, Acquario di Casa), trofei/giochi/armi/sport → salone (il resto, incl. Trofeo Braccio di Ferro, Trofeo d'Oro, Targa Traslocatore). La Pianta Esotica (M12 super) è l'unico arredo mettibile in QUALSIASI stanza. Ogni stanza ha 3 slot con supporti dedicati (v. rooms.js _slotSpots/_slotTipi). Da rifinire in sessione design se servono ribilanciamenti.
 
 Da decidere in sessione design:
 - Quanti slot arredo per stanza nel prototipo (proposta: 3)

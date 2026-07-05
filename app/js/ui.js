@@ -160,7 +160,9 @@ window.PETQ = window.PETQ || {};
   var missioneSelezionata = null; // id del pin selezionato sulla mappa missioni
   var mapPointer = null;          // gesto in corso sul canvas mappa
   var frigoAperto = false;        // pannello frigo (cucina) aperto/chiuso
-  var negozioSelezionato = false; // pannello acquisto shop (mappa) aperto/chiuso
+  var negozioSelezionato = false; // pannello negozio (mappa) aperto/chiuso
+  var shopSezione = 'cibo';       // sezione attiva del negozio: 'cibo' | 'arredi' | 'vendi'
+  var vendiConferma = null;       // nome dell'arredo-perk in attesa di conferma vendita
 
   // ---------- util ----------
 
@@ -526,9 +528,10 @@ window.PETQ = window.PETQ || {};
     wrap.appendChild(hud);
 
     var tabs = el('div', 'petq-tabs');
-    // PROTOTIPO 2, Blocco 7 — TAB NEGOZIO: nuova tab "Negozio" tra Camera e Missioni (comprare
-    // arredi decorativi/utility). Come Missioni, e' una schermata-menu senza canvas stanza.
-    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['camera', 'Camera'], ['negozio', 'Negozio'], ['missioni', 'Missioni']];
+    // PROTOTIPO 2, Blocco 7 — il NEGOZIO non e' piu' una tab della casa: la compravendita di
+    // arredi vive DENTRO il negozio vero (pin sulla mappa, sezioni Cibo/Arredi/Vendi in
+    // pannelloShop). Le tab casa tornano Cucina/Bagno/Salone/Camera/Missioni.
+    var stanze = [['cucina', 'Cucina'], ['bagno', 'Bagno'], ['salone', 'Salone'], ['camera', 'Camera'], ['missioni', 'Missioni']];
     for (var i = 0; i < stanze.length; i++) {
       (function (chiave, label) {
         var tab = el('button', 'petq-tab', label);
@@ -605,8 +608,8 @@ window.PETQ = window.PETQ || {};
     aggiornaTabsAttive();
     aggiornaHud(currentState);
 
-    // le tab Missioni e Negozio sono schermate-menu: l'area stanza (canvas) resta nascosta
-    var soloMenu = (currentStanza === 'missioni' || currentStanza === 'negozio');
+    // la tab Missioni e' una schermata-menu: l'area stanza (canvas) resta nascosta
+    var soloMenu = (currentStanza === 'missioni');
     var area = document.querySelector('.petq-stanza-area');
     if (area) area.style.display = soloMenu ? 'none' : '';
 
@@ -1751,7 +1754,6 @@ window.PETQ = window.PETQ || {};
     if (currentStanza === 'cucina') renderAzioniCucina(azioni);
     else if (currentStanza === 'bagno') renderAzioniBagno(azioni);
     else if (currentStanza === 'camera') renderAzioniCamera(azioni);
-    else if (currentStanza === 'negozio') renderTabNegozio(azioni);
     else if (currentStanza === 'missioni') renderTabMissioni(azioni);
     else renderAzioniSalone(azioni);
   }
@@ -2459,53 +2461,10 @@ window.PETQ = window.PETQ || {};
     return 'solo decorativo';
   }
 
-  function renderTabNegozio(container) {
-    var wrap = el('div', 'petq-missione-card petq-shop-card');
-    wrap.appendChild(el('div', 'petq-missione-titolo', 'Negozio arredi'));
-    wrap.appendChild(el('div', 'petq-missione-meta',
-      'Compra arredi per la casa: finiscono nella tua Collezione (nel Salone), poi li piazzi nelle stanze. Monete: ' + (currentState.coins || 0) + '.'));
-
-    var data = window.PETQ.content && window.PETQ.content.data;
-    var arredi = (data && data.arredi) || [];
-
-    // comprabili = quelli con prezzoNegozio numerico (fonte "negozio N monete"), raggruppati
-    // per stanza di destinazione. Stanza sconosciuta/"ovunque" -> salone (coerente con la
-    // Collezione, che vive nel salone: v. rigaArredo).
-    var STANZE_ORD = ['cucina', 'bagno', 'salone', 'camera'];
-    var gruppi = { cucina: [], bagno: [], salone: [], camera: [] };
-    for (var i = 0; i < arredi.length; i++) {
-      var a = arredi[i];
-      if (typeof a.prezzoNegozio !== 'number') continue;
-      var stanza = (STANZE_ORD.indexOf(a.stanza) !== -1) ? a.stanza : 'salone';
-      gruppi[stanza].push(a);
-    }
-
-    var totale = 0;
-    for (var g = 0; g < STANZE_ORD.length; g++) {
-      var st = STANZE_ORD[g];
-      var lista = gruppi[st];
-      if (lista.length === 0) continue;
-      totale += lista.length;
-
-      wrap.appendChild(el('div', 'petq-shop-gruppo-titolo', capitalize(st)));
-      var box = el('div', 'petq-shop-lista');
-      for (var k = 0; k < lista.length; k++) {
-        box.appendChild(rigaNegozioArredo(lista[k], st));
-      }
-      wrap.appendChild(box);
-    }
-
-    if (totale === 0) {
-      wrap.appendChild(el('p', 'petq-vuoto', 'Nessun arredo in vendita al momento.'));
-    }
-
-    // TODO (PROTOTIPO 2, Blocco 7 — batch separato, richiede decisione di design del fondatore):
-    // qui va la sezione "Amplia slot" per comprare slot arredo aggiuntivi per stanza. Oggi sono
-    // 3 posizioni fisse disegnate per stanza (rooms.js SLOT_SPOTS): l'espansione richiede nuovi
-    // supporti disegnati + progressione prezzi, quindi resta fuori da questo batch.
-
-    container.appendChild(wrap);
-  }
+  // TODO (PROTOTIPO 2, Blocco 7 — batch separato, richiede decisione di design del fondatore):
+  // la sezione "Amplia slot" (comprare slot arredo aggiuntivi per stanza) andra' aggiunta come
+  // 4a sotto-scheda del negozio. Oggi sono 3 posizioni fisse disegnate per stanza (rooms.js
+  // SLOT_SPOTS): l'espansione richiede nuovi supporti disegnati + progressione prezzi.
 
   function rigaNegozioArredo(info, stanza) {
     var riga = el('div', 'petq-shop-riga');
@@ -2537,13 +2496,14 @@ window.PETQ = window.PETQ || {};
 
   // Compra 1 arredo: rivalida prezzo e possesso (niente doppioni dal negozio, l'arredo e' unico),
   // scala le monete e chiama arredi.aggiungi (finisce nei POSSEDUTI; il giocatore lo piazza poi
-  // dalla Collezione nella stanza giusta). Ridisegna la tab per aggiornare monete/stato bottone.
+  // dalla Collezione nella stanza giusta). Ridisegna il pannello negozio (sezione Arredi) per
+  // aggiornare monete/stato bottone.
   function eseguiAcquistoArredo(info, rigaEl) {
     if (!currentState) return;
     if (arredoGiaInCollezione(info.nome)) {
       shakeCard(rigaEl);
       mostraToast('Ce l\'hai già in collezione.');
-      renderAzioni();
+      aggiornaDettaglioMappa(statoMappa());
       return;
     }
     if (typeof info.prezzoNegozio !== 'number') {
@@ -2565,7 +2525,7 @@ window.PETQ = window.PETQ || {};
     currentState.coins -= info.prezzoNegozio;
     PETQ.save.save(currentState);
     aggiornaHud(currentState);
-    renderAzioni();
+    aggiornaDettaglioMappa(statoMappa());
     mostraToast(info.nome + ' comprato: è nella Collezione (Salone), ora piazzalo nella stanza.');
   }
 
@@ -2786,16 +2746,47 @@ window.PETQ = window.PETQ || {};
   // acquista 1 porzione, ripetibile, scala le monete e incrementa la qty in dispensa (frigo).
   // Stesso edificio del tutorial m0: prima del tutorial il tap apre cardTutorial, dopo apre
   // questo pannello (v. statoMappa/aggiornaDettaglioMappa/installaPointerMappa).
+  // PROTOTIPO 2, Blocco 7 — il negozio ha 3 sezioni interne (Cibo/Arredi/Vendi) selezionabili
+  // in cima. Riusa .petq-tab della casa per le sotto-schede. La sezione attiva vive in
+  // shopSezione (persiste finche' il negozio resta aperto; ripartito su 'cibo' all'apertura del
+  // pin, v. installaPointerMappa). Il corpo cambia in base alla sezione, l'intestazione resta.
   function pannelloShop() {
     var wrap = el('div', 'petq-missione-card petq-shop-card');
     wrap.appendChild(el('div', 'petq-missione-titolo', 'Negozio'));
+
+    // barra sotto-schede
+    var tabs = el('div', 'petq-tabs petq-shop-tabs');
+    var SEZIONI = [['cibo', 'Cibo'], ['arredi', 'Arredi'], ['vendi', 'Vendi']];
+    for (var s = 0; s < SEZIONI.length; s++) {
+      (function (chiave, label) {
+        var t = el('button', 'petq-tab' + (shopSezione === chiave ? ' petq-tab-attiva' : ''), label);
+        t.addEventListener('click', function () {
+          if (shopSezione === chiave) return;
+          shopSezione = chiave;
+          vendiConferma = null; // cambiando sezione si annulla ogni conferma vendita pendente
+          aggiornaDettaglioMappa(statoMappa());
+        });
+        tabs.appendChild(t);
+      })(SEZIONI[s][0], SEZIONI[s][1]);
+    }
+    wrap.appendChild(tabs);
+
+    if (shopSezione === 'arredi') renderShopArredi(wrap);
+    else if (shopSezione === 'vendi') renderShopVendi(wrap);
+    else renderShopCibo(wrap);
+
+    return wrap;
+  }
+
+  // Sezione CIBO: acquisto cibo (invariato dal P1), incluso il "Ruba" del talento furto.
+  function renderShopCibo(wrap) {
     wrap.appendChild(el('div', 'petq-missione-meta', 'Compra cibo: finisce nel frigo in cucina, gratis da lì in poi.'));
 
     var data = window.PETQ.content && window.PETQ.content.data;
     var cibi = (data && data.cibi) || [];
     if (cibi.length === 0) {
       wrap.appendChild(el('p', 'petq-vuoto', 'Nessun cibo disponibile.'));
-      return wrap;
+      return;
     }
 
     // Talenti (PROTOTIPO 2, Blocco 9, Gruppo D, "furto=1/giorno", Cleptomane/Boss di Quartiere):
@@ -2853,7 +2844,148 @@ window.PETQ = window.PETQ || {};
       })(cibi[i]);
     }
     wrap.appendChild(lista);
-    return wrap;
+  }
+
+  // Sezione ARREDI: compra i decorativi con prezzoNegozio, raggruppati per stanza di
+  // destinazione. Spostata qui dalla vecchia tab casa "Negozio" (renderTabNegozio, rimossa):
+  // stesso comportamento (gia'-in-collezione disabilitato, monete insufficienti disabilitato).
+  // L'arredo comprato va nei POSSEDUTI; il giocatore lo piazza poi dalla Collezione (Salone).
+  function renderShopArredi(wrap) {
+    wrap.appendChild(el('div', 'petq-missione-meta',
+      'Compra arredi: finiscono nella Collezione (Salone), poi li piazzi nelle stanze. Monete: ' + (currentState.coins || 0) + '.'));
+
+    var data = window.PETQ.content && window.PETQ.content.data;
+    var arredi = (data && data.arredi) || [];
+
+    var STANZE_ORD = ['cucina', 'bagno', 'salone', 'camera'];
+    var gruppi = { cucina: [], bagno: [], salone: [], camera: [] };
+    for (var i = 0; i < arredi.length; i++) {
+      var a = arredi[i];
+      if (typeof a.prezzoNegozio !== 'number') continue;
+      var stanza = (STANZE_ORD.indexOf(a.stanza) !== -1) ? a.stanza : 'salone';
+      gruppi[stanza].push(a);
+    }
+
+    var totale = 0;
+    for (var g = 0; g < STANZE_ORD.length; g++) {
+      var st = STANZE_ORD[g];
+      var lista = gruppi[st];
+      if (lista.length === 0) continue;
+      totale += lista.length;
+      wrap.appendChild(el('div', 'petq-shop-gruppo-titolo', capitalize(st)));
+      var box = el('div', 'petq-shop-lista');
+      for (var k = 0; k < lista.length; k++) {
+        box.appendChild(rigaNegozioArredo(lista[k], st));
+      }
+      wrap.appendChild(box);
+    }
+
+    if (totale === 0) {
+      wrap.appendChild(el('p', 'petq-vuoto', 'Nessun arredo in vendita al momento.'));
+    }
+  }
+
+  // arredoDaPerk: vero se l'arredo da' un PERK (di categoria: campo perk valorizzato, o la
+  // colonna Bonus grezza contiene "perk"). La vendita di un perk va AVVISATA e confermata
+  // (secondo tap), non impedita: v. renderRigaVendi/eseguiVendita.
+  function arredoDaPerk(nome) {
+    var info = trovaArredoContentUI(nome);
+    if (!info) return false;
+    if (info.perk) return true;
+    if (info.bonus && /perk/i.test(info.bonus)) return true;
+    return false;
+  }
+
+  function trovaArredoContentUI(nome) {
+    var data = window.PETQ.content && window.PETQ.content.data;
+    var elenco = (data && data.arredi) || [];
+    for (var i = 0; i < elenco.length; i++) {
+      if (elenco[i].nome === nome) return elenco[i];
+    }
+    return null;
+  }
+
+  // valore di rivendita (50%) mostrato sul bottone: stessa formula di arredi.vendi (prezzo
+  // "negozio N" dalla fonte, fallback 10). Solo per l'ETICHETTA; l'accredito reale lo fa vendi().
+  function valoreRivendita(nome) {
+    var info = trovaArredoContentUI(nome);
+    var valore = 10;
+    if (info && info.fonte) {
+      var m = info.fonte.match(/negozio\s+(\d+)/i);
+      if (m) valore = parseInt(m[1], 10);
+    }
+    return Math.round(valore * 0.5);
+  }
+
+  // Sezione VENDI: elenca gli arredi POSSEDUTI e NON piazzati (state.arredi.posseduti),
+  // vendibili al 50% via arredi.vendi. Gli arredi piazzati NON compaiono (vanno prima rimossi
+  // dalla Collezione). Un arredo-perk mostra un avviso e chiede conferma (secondo tap).
+  function renderShopVendi(wrap) {
+    wrap.appendChild(el('div', 'petq-missione-meta',
+      'Vendi gli arredi che possiedi e non hai piazzato: recuperi il 50%. Monete: ' + (currentState.coins || 0) + '.'));
+
+    PETQ.arredi._assicuraArrediStruct(currentState);
+    var posseduti = (currentState.arredi && currentState.arredi.posseduti) || [];
+
+    if (posseduti.length === 0) {
+      wrap.appendChild(el('p', 'petq-vuoto', 'Niente da vendere.'));
+      return;
+    }
+
+    var box = el('div', 'petq-shop-lista');
+    for (var i = 0; i < posseduti.length; i++) {
+      box.appendChild(renderRigaVendi(posseduti[i]));
+    }
+    wrap.appendChild(box);
+  }
+
+  function renderRigaVendi(voce) {
+    var nome = voce.nome;
+    var riga = el('div', 'petq-shop-riga');
+    var ricavo = valoreRivendita(nome);
+    var perk = arredoDaPerk(nome);
+
+    var testi = el('div', 'petq-shop-info');
+    testi.appendChild(el('div', 'petq-cibo-nome', nome));
+    var sotto = el('div', 'petq-cibo-effetti', 'Valore di vendita: ' + ricavo + ' monete');
+    testi.appendChild(sotto);
+    if (perk) {
+      var avviso = el('div', 'petq-shop-perk-avviso', '⚠ dà un perk!');
+      testi.appendChild(avviso);
+    }
+    riga.appendChild(testi);
+
+    var inConferma = perk && vendiConferma === nome;
+    var etichetta = inConferma ? 'Confermi?' : ('Vendi (+' + ricavo + ')');
+    var btn = el('button', 'petq-btn petq-btn-mini' + (inConferma ? ' petq-btn-conferma' : ''), etichetta);
+    btn.addEventListener('click', function () {
+      // arredo-perk: il primo tap chiede conferma (senza vendere), il secondo vende.
+      if (perk && vendiConferma !== nome) {
+        vendiConferma = nome;
+        aggiornaDettaglioMappa(statoMappa());
+        return;
+      }
+      eseguiVendita(nome, riga);
+    });
+    riga.appendChild(btn);
+    return riga;
+  }
+
+  // Vende un arredo posseduto: arredi.vendi accredita il 50% e lo toglie dai posseduti; poi si
+  // ridisegna la lista (l'arredo sparisce). Salvataggio + HUD aggiornati.
+  function eseguiVendita(nome, rigaEl) {
+    if (!currentState) return;
+    var r = PETQ.arredi.vendi(currentState, nome);
+    if (!r || !r.ok) {
+      shakeCard(rigaEl);
+      mostraToast((r && r.msg) || 'Vendita non riuscita.');
+      return;
+    }
+    vendiConferma = null;
+    PETQ.save.save(currentState);
+    aggiornaHud(currentState);
+    aggiornaDettaglioMappa(statoMappa());
+    mostraToast(r.msg);
   }
 
   // Furto (talento Cleptomane/Boss di Quartiere): aggiunge 1 porzione del cibo alla dispensa
@@ -2964,6 +3096,8 @@ window.PETQ = window.PETQ || {};
       // vedere col motore missioni. Tap fuori dal pin mentre il negozio e' aperto lo chiude.
       if (hitShopPin(p)) {
         negozioSelezionato = true;
+        shopSezione = 'cibo';   // il negozio si apre sempre sulla sezione Cibo
+        vendiConferma = null;
         missioneSelezionata = null;
         aggiornaDettaglioMappa(statoMappa());
         return;

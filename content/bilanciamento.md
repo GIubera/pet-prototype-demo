@@ -100,9 +100,13 @@ Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 3 
 | Combattimento | Street Fighter | M3, Completo da martial artist |
 | Sport | Tony Hawk | M8, Pattini da gara |
 | Studio | Doc Brown | M9, Coppa della Fiera |
-| tag `gara` | Sabotatore | M10, Telecomando Pirata — vale sulle gare taggate SENZA perk di categoria proprio (esclude Videogioco/Sport) |
+| tag `gara` | Sabotatore | M10, Telecomando Pirata — vale su TUTTE le missioni tag `gara` (overlap con Player One/Street Fighter/Tony Hawk innocuo, decisione fondatore 5 lug) |
+| tag `inseguimento` | Parkour Master | M15, Scarpe da Parkour |
+| passivo (verdure→Forza) | Popeye / Braccio di Ferro | M13, Trofeo d'Oro — NON è un vinci-categoria: mangiando verdure il pet prende anche +1 Forza. In IT il perk si chiama "Braccio di Ferro" |
 
 Sociale e Consegne non hanno ancora perk. (Nota release EN: nomi-citazione da rivalutare — parodia o storpiatura, es. "Street Brawler".)
+
+**Token DSL nuovi (batch missioni P2 baby M13-M16, da agganciare nel motore):** `tag=` sulle schede (usato da talenti e dai perk `gara`/`inseguimento`, oltre a `natura`/`invenzione`); `talento:X` nelle condizioni (la cond controlla se il pet HA un talento — es. Inventore/Energico/Idrofobico/Amante della Natura, non solo personalità+stat); `energiaMissione=0` (missione a costo energia nullo, es. montacarichi Nerd-Inventore); perk **passivo** (Popeye, non un vinci-categoria); **cibo multi-porzione** (Arrosto = 3 fette, v. cibi.md); **categoria nuova** `lavoretti`.
 
 ## Arredi e bonus passivi (PROPOSTA)
 

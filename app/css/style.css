@@ -821,6 +821,31 @@ button {
   min-width: 0;
 }
 
+/* Sotto-schede del negozio (Cibo/Arredi/Vendi): riusano .petq-tab, un filo piu' compatte
+   e staccate dal titolo del pannello. */
+.petq-shop-tabs {
+  margin: 8px 0 4px;
+}
+
+.petq-shop-tabs .petq-tab {
+  padding: 7px 0;
+  font-size: 13px;
+}
+
+/* Avviso "dà un perk!" nella sezione Vendi: giallo, sotto il valore di vendita. */
+.petq-shop-perk-avviso {
+  color: #f2c14e;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Bottone "Confermi?" (secondo tap) per vendere un arredo-perk: tono rosso di allerta. */
+.petq-btn-conferma {
+  background: #e85a78;
+  color: #2a0f14;
+}
+
 /* ---------- Ferite (HUD) e dispensa ---------- */
 
 .petq-ferite {
