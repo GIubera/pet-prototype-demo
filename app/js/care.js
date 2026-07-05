@@ -123,10 +123,20 @@ window.PETQ = window.PETQ || {};
     return { ok: true, msg: 'Casa pulita.' };
   }
 
-  // Coccola: felicità+3, max 5 al giorno. Numero max/giorno non specificato altrove
+  // Coccola: felicità+3, max 5 al giorno (default). Numero max/giorno non specificato altrove
   // nella config: tracciato in state.coccoleDay/state.coccoleCount (default locale, segnalato).
+  // Cap talenti (PROTOTIPO 2, Blocco 9, "Coccolone"): il cap 5 diventa 8 se il pet ha quel
+  // talento attivo — letto ad ogni chiamata da PETQ.talenti.capCoccole (hook dedicato, stesso
+  // spirito di PETQ.arredi.bonusAllenamento per il Topo).
   var COCCOLA_EFFETTO = 3;
-  var COCCOLA_MAX_DIE = 5;
+  var COCCOLA_MAX_DIE_DEFAULT = 5;
+
+  function capCoccoleGiorno(state) {
+    if (PETQ.talenti && typeof PETQ.talenti.capCoccole === 'function') {
+      return PETQ.talenti.capCoccole(state);
+    }
+    return COCCOLA_MAX_DIE_DEFAULT;
+  }
 
   function coccola(state) {
     if (!state || !state.pet) return { ok: false, msg: 'errore interno' };
@@ -135,7 +145,8 @@ window.PETQ = window.PETQ || {};
       state.coccoleDay = oggi;
       state.coccoleCount = 0;
     }
-    if ((state.coccoleCount || 0) >= COCCOLA_MAX_DIE) {
+    var capOggi = capCoccoleGiorno(state);
+    if ((state.coccoleCount || 0) >= capOggi) {
       // Cap raggiunto (GDD "Coccole" / bilanciamento playtest 4 lug 2026): battuta di
       // personalita' dedicata (pool 'coccole_finite', testi del socio) invece del messaggio
       // generico. msg resta come fallback per la UI se il pool risulta vuoto (v. ui.js
@@ -343,10 +354,12 @@ window.PETQ = window.PETQ || {};
     teachWord: teachWord,
     dailyLogin: dailyLogin,
     cura: cura,
+    capCoccoleGiorno: capCoccoleGiorno,
     _consumaDaDispensa: consumaDaDispensa,
     _sogliaSovralimentazione: sogliaSovralimentazione,
     _feriteSovralimentazione: FERITE_SOVRALIMENTAZIONE,
-    _durataAllenamentoOre: DURATA_ALLENAMENTO_ORE
+    _durataAllenamentoOre: DURATA_ALLENAMENTO_ORE,
+    _coccolaMaxDieDefault: COCCOLA_MAX_DIE_DEFAULT
   };
 
 })();

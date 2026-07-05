@@ -113,10 +113,32 @@ window.PETQ = window.PETQ || {};
       // giorniVita conta i giorni DI GIOCO vissuti (incrementato ad ogni "nuovo giorno", v.
       // care.dailyLogin), non i giorni di calendario reale — cosi' il debug "Nuovo giorno" lo
       // fa avanzare ed e' testabile senza aspettare la mezzanotte vera.
-      giorniVita: 0
+      giorniVita: 0,
+      // Talenti (PROTOTIPO 2, Blocco 9, content/talenti.md): array cumulativo, 1 elemento alla
+      // nascita + 1 alla evoluzione teen (v. controllaEvoluzione sotto). generate() non riceve
+      // `state` (e non ne ha bisogno: PETQ.talenti.estrai legge PETQ.content.data + PETQ.rng,
+      // nessuno stato di partita necessario per l'estrazione), percio' l'assegnazione avviene
+      // qui direttamente sul pet appena creato.
+      talenti: []
     };
 
+    assegnaTalentoNascita(pet);
+
     return pet;
+  }
+
+  // Estrae 1 talento dalla terna 'nascita' della personalita' del pet (pesi 45/45/10, v.
+  // talenti.js estrai/_estraiDaTerna) e lo aggiunge a pet.talenti. Guardia difensiva se il
+  // modulo PETQ.talenti non e' ancora caricato (ordine script in index.html) o il content non
+  // e' pronto: non blocca la creazione del pet, semplicemente il pet nasce senza talenti (si
+  // puo' rimediare con "Ri-tira talenti" in debug una volta caricato tutto).
+  function assegnaTalentoNascita(pet) {
+    if (!pet || !window.PETQ.talenti || typeof PETQ.talenti.estrai !== 'function') {
+      console.warn('PETQ.pet: PETQ.talenti non disponibile, il pet nasce senza talento (nascita)');
+      return;
+    }
+    var talento = PETQ.talenti.estrai(pet.personalita, 'nascita');
+    if (talento) pet.talenti.push(talento);
   }
 
   // soglie/valori malus condizioni Salute: da bilanciamento.md sezione "Sistema Salute" ->
@@ -390,6 +412,35 @@ window.PETQ = window.PETQ || {};
     pet.stadio = 'teen';
     // TODO stat evoluzione: nessuna modifica a pet.stats/pet.rpg per ora (solo stadio+aspetto
     // +battuta, v. commento sopra). Lasciato volutamente senza codice fino a decisione fondatore.
+
+    // Talenti (PROTOTIPO 2, Blocco 9): all'evoluzione teen si estrae 1 talento dalla terna
+    // 'teen' della personalita' e si AGGIUNGE (cumulativo) a pet.talenti, che gia' contiene il
+    // talento-nascita: un teen ha sempre 2 talenti attivi insieme (v. talenti.md "Cumulativi").
+    if (!Array.isArray(pet.talenti)) pet.talenti = [];
+    if (window.PETQ.talenti && typeof PETQ.talenti.estrai === 'function') {
+      var talentoTeen = PETQ.talenti.estrai(pet.personalita, 'teen');
+      if (talentoTeen) pet.talenti.push(talentoTeen);
+    } else {
+      console.warn('PETQ.pet: PETQ.talenti non disponibile, evoluzione senza talento teen');
+    }
+
+    return true;
+  }
+
+  // Debug "Ri-tira talenti" (v. ui.js pannello ?debug): ri-estrae DA CAPO i talenti del pet
+  // rispettando lo stadio attuale — 1 (nascita) se baby, 2 (nascita+teen) se teen — cosi' si
+  // possono provare combinazioni diverse senza dover far rinascere/evolvere il pet daccapo.
+  // Sostituisce interamente pet.talenti (non aggiunge alle estrazioni precedenti).
+  function ritiraTalenti(pet) {
+    if (!pet || !window.PETQ.talenti || typeof PETQ.talenti.estrai !== 'function') return false;
+    var nuovi = [];
+    var nascita = PETQ.talenti.estrai(pet.personalita, 'nascita');
+    if (nascita) nuovi.push(nascita);
+    if (pet.stadio === 'teen') {
+      var teen = PETQ.talenti.estrai(pet.personalita, 'teen');
+      if (teen) nuovi.push(teen);
+    }
+    pet.talenti = nuovi;
     return true;
   }
 
@@ -578,6 +629,7 @@ window.PETQ = window.PETQ || {};
     debugSaltaAlMattino: debugSaltaAlMattino,
     controllaAllenamentoScaduto: controllaAllenamentoScaduto,
     controllaEvoluzione: controllaEvoluzione,
+    ritiraTalenti: ritiraTalenti,
     _risolviRisveglio: risolviRisveglio,
     _giorniEvoluzioneTeen: GIORNI_EVOLUZIONE_TEEN,
     _soglieCiccionePerStadio: SOGLIE_CICCIONE_PER_STADIO

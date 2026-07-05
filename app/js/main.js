@@ -120,6 +120,21 @@ window.PETQ = window.PETQ || {};
       PETQ.clock.inizializzaOrologio(state);
     }
 
+    // Migrazione Talenti (PROTOTIPO 2, Blocco 9): stessa regola duplicata in save.js
+    // migraState (v. commento esteso li'). Assegna retroattivamente nascita (+teen se gia'
+    // teen) ai salvataggi pre-esistenti che non hanno ancora pet.talenti.
+    if (state.pet && !Array.isArray(state.pet.talenti)) {
+      state.pet.talenti = [];
+      if (PETQ.talenti && typeof PETQ.talenti.estrai === 'function') {
+        var talentoNascita = PETQ.talenti.estrai(state.pet.personalita, 'nascita');
+        if (talentoNascita) state.pet.talenti.push(talentoNascita);
+        if (state.pet.stadio === 'teen') {
+          var talentoTeen = PETQ.talenti.estrai(state.pet.personalita, 'teen');
+          if (talentoTeen) state.pet.talenti.push(talentoTeen);
+        }
+      }
+    }
+
     if (PETQ.pet && state.pet) {
       PETQ.pet.recomputeSalute(state.pet, state);
     }

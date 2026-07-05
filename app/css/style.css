@@ -280,7 +280,21 @@ button {
   margin-top: 4px;
   font-weight: 700;
   color: #e8c84c;
-  text-align: right;
+}
+
+/* Riga monete + bottone Scheda (PROTOTIPO-2.md Blocco 9): stessa riga in fondo all'HUD,
+   cosi' la scheda personaggio e' sempre a portata di tap. */
+.petq-riga-monete {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.petq-btn-scheda {
+  background: #3ee6d0;
+  color: #0d1a17;
 }
 
 .petq-tabs {
@@ -884,4 +898,133 @@ button {
   text-align: center;
   color: #8a7f63;
   font-style: italic;
+}
+
+/* ---------- Scheda personaggio (PROTOTIPO-2.md punto 3 / Blocco 9) ---------- */
+/* Overlay "a foglio" sopra la scena corrente, stesso pattern del diario (petq-diario-overlay):
+   "Chiudi" si limita a rimuovere il nodo, niente reset di currentStanza. Tema scuro/HUD (non
+   "carta" come il diario) perche' e' una scheda statistiche, non un testo scritto a mano. */
+
+.petq-scheda-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 20, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+  padding: 20px;
+}
+
+.petq-scheda-pagina {
+  background: #1c2027;
+  color: #eceff2;
+  border-radius: 10px;
+  padding: 18px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.petq-scheda-titolo {
+  margin: 0;
+  font-size: 20px;
+  text-align: center;
+}
+
+.petq-scheda-sottotitolo {
+  margin: 0 0 8px;
+  text-align: center;
+  color: #a7adba;
+  font-size: 13px;
+}
+
+.petq-scheda-sezione {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #3ee6d0;
+  border-top: 1px solid #333a46;
+  padding-top: 8px;
+}
+
+.petq-scheda-rpg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.petq-scheda-rpg-riga {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.petq-scheda-rpg-label { color: #a7adba; }
+.petq-scheda-rpg-val { font-weight: 700; }
+
+.petq-scheda-talento {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #333a46;
+}
+
+.petq-scheda-talento:last-of-type { border-bottom: none; }
+
+.petq-talento-pallino {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 3px;
+}
+
+.petq-talento-normale { background: #ccd2db; }
+.petq-talento-raro { background: #e8c84c; box-shadow: 0 0 6px rgba(232, 200, 76, 0.7); }
+
+.petq-talento-testo { flex: 1; }
+
+.petq-talento-nome {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.petq-talento-effetto {
+  font-size: 12px;
+  color: #a7adba;
+  margin-top: 2px;
+}
+
+.petq-scheda-perklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.petq-scheda-perk {
+  background: #2a3f3c;
+  color: #3ee6d0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.petq-scheda-vuoto {
+  color: #8a94a0;
+  font-style: italic;
+  font-size: 13px;
+  margin: 2px 0;
+}
+
+.petq-scheda-pagina .petq-btn-primario {
+  margin-top: 12px;
 }

@@ -68,11 +68,13 @@ window.PETQ = window.PETQ || {};
       arredi: [],
       bilanciamento: null,
       missioni: [],
-      diario: {}
+      diario: {},
+      talenti: {}
     },
     load: load,
     _parseBilanciamento: parseBilanciamento, // esposto per test di parsing (pattern _get*/_assert* del codebase)
-    _parseDiario: parseDiario
+    _parseDiario: parseDiario,
+    _parseTalenti: parseTalenti
   };
 
   function load(callback) {
@@ -85,6 +87,7 @@ window.PETQ = window.PETQ || {};
     percorsi.push('bilanciamento');
     percorsi.push('missioni');
     percorsi.push('diario');
+    percorsi.push('talenti');
 
     caricaTutti(percorsi, function (raw) {
       var data = window.PETQ.content.data;
@@ -100,6 +103,7 @@ window.PETQ = window.PETQ || {};
       data.arredi = parseArredi(raw['arredi'] || '');
       data.missioni = parseMissioni(raw['missioni'] || '');
       data.diario = parseDiario(raw['diario'] || '');
+      data.talenti = parseTalenti(raw['talenti'] || '');
 
       var bilOk = null;
       try {
@@ -282,6 +286,124 @@ window.PETQ = window.PETQ || {};
         var frammento = riga.substring(2).trim();
         if (frammento !== '') out[personalitaCorrente][chiaveCorrente].push(frammento);
       }
+    }
+
+    return out;
+  }
+
+  // ---------- parser talenti (PROTOTIPO 2, Blocco 9, content/talenti.md) ----------
+  // Struttura del file: sezioni "## <Personalita> — firma <Stat>" (una per personalita', stesse
+  // chiavi di PERSONALITA_FILES), ognuna con due tabelle sotto "### Nascita (estrai 1)" e
+  // "### Teen (estrai 1)": colonne | Talento | Rarita | Effetto | Dati |. Rarita: 🟡 = raro
+  // (true), ⚪ (o qualunque altro simbolo/etichetta "normale") = normale (false). "Dati" e' la
+  // stringa DSL grezza (token separati da " ; ", stesso stile del DSL missioni): il parser la
+  // spacca in un array "effetti" ma NON interpreta i singoli token (motore futuro, v.
+  // PETQ.talenti in talenti.js per il registry di cosa e' agganciato vs TODO).
+  // Ritorna { <personalita>: { nascita: [ {nome,raro,effettoTesto,dati,effetti[]} x3 ], teen: [...] } }.
+  // Tollerante: sezioni/tabelle mancanti o malformate producono array vuoti + console.warn,
+  // mai un'eccezione che blocca il resto del caricamento.
+
+  var TALENTI_STADI = ['nascita', 'teen'];
+
+  function vuotoTalentiPersonalita() {
+    var p = {};
+    for (var i = 0; i < TALENTI_STADI.length; i++) p[TALENTI_STADI[i]] = [];
+    return p;
+  }
+
+  function parseTalenti(testo) {
+    var out = {};
+    for (var i = 0; i < PERSONALITA_FILES.length; i++) out[PERSONALITA_FILES[i]] = vuotoTalentiPersonalita();
+    if (!testo) return out;
+
+    var righe = testo.split(/\r?\n/);
+
+    // individua i blocchi "## <Personalita> — ..." (una sezione per personalita'; ferma al
+    // prossimo "## " di livello pari, es. "## Pool Inventore" o "## Dipendenze / da fare in P2",
+    // che non sono personalita' e vanno ignorati con un warning se non riconosciuti).
+    var blocchi = [];
+    var corrente = null;
+    for (var r = 0; r < righe.length; r++) {
+      var riga = righe[r];
+      if (riga.indexOf('## ') === 0) {
+        if (corrente) blocchi.push(corrente);
+        var titolo = riga.substring(3).trim();
+        // "Sportivo — firma Forza" -> prima parola prima del trattino/em-dash, minuscolo
+        var nomePers = titolo.split(/[—–-]/)[0].trim().toLowerCase();
+        corrente = { personalita: (out[nomePers]) ? nomePers : null, titolo: titolo, righe: [] };
+        continue;
+      }
+      if (corrente) corrente.righe.push(riga);
+    }
+    if (corrente) blocchi.push(corrente);
+
+    for (var b = 0; b < blocchi.length; b++) {
+      var blocco = blocchi[b];
+      if (!blocco.personalita) continue; // sezioni non-personalita' (Pool Inventore, Dipendenze, Come estendere...)
+      try {
+        out[blocco.personalita] = parseSezionePersonalitaTalenti(blocco.righe, blocco.personalita);
+      } catch (e) {
+        console.warn('PETQ.content: errore parsing talenti per "' + blocco.personalita + '", terne vuote', e);
+      }
+    }
+
+    return out;
+  }
+
+  // Dentro la sezione di una personalita': individua le due sotto-sezioni "### Nascita ..." e
+  // "### Teen ..." (stadio = lista aperta per estensioni future, v. talenti.md "Come estendere":
+  // qui riconosciamo solo nascita/teen perche' sono le uniche presenti in P2, ma il ciclo su
+  // TALENTI_STADI sopra e' gia' pronto a crescere se in futuro si aggiunge "### Adulto").
+  function parseSezionePersonalitaTalenti(righe, nomePersonalita) {
+    var out = vuotoTalentiPersonalita();
+    var stadioCorrente = null;
+    var righeStadio = {};
+    for (var i = 0; i < TALENTI_STADI.length; i++) righeStadio[TALENTI_STADI[i]] = [];
+
+    for (var i = 0; i < righe.length; i++) {
+      var riga = righe[i];
+      var mSotto = riga.match(/^###\s+(.+)$/);
+      if (mSotto) {
+        var titoloStadio = mSotto[1].toLowerCase();
+        if (titoloStadio.indexOf('nascita') !== -1) stadioCorrente = 'nascita';
+        else if (titoloStadio.indexOf('teen') !== -1) stadioCorrente = 'teen';
+        else stadioCorrente = null; // es. eventuali sotto-sezioni future non ancora note
+        continue;
+      }
+      if (stadioCorrente) righeStadio[stadioCorrente].push(riga);
+    }
+
+    for (var s = 0; s < TALENTI_STADI.length; s++) {
+      var stadio = TALENTI_STADI[s];
+      var tabella = primaTabella(righeStadio[stadio].join('\n'));
+      if (!tabella) {
+        console.warn('PETQ.content: nessuna terna "' + stadio + '" trovata per personalita "' + nomePersonalita + '"');
+        continue;
+      }
+      var terna = [];
+      for (var j = 0; j < tabella.righe.length; j++) {
+        var c = tabella.righe[j];
+        if (c.length < 4) continue;
+        var nome = (c[0] || '').trim();
+        if (nome === '' || /^talento$/i.test(nome)) continue; // salta eventuale riga header ripetuta
+        var rarita = (c[1] || '');
+        var raro = rarita.indexOf('🟡') !== -1 || /raro/i.test(rarita);
+        var effettoTesto = (c[2] || '').trim();
+        // la colonna Dati e' scritta come codice inline in markdown (`token ; token`): tolti i
+        // backtick prima di splittare, altrimenti restano attaccati al primo/ultimo token.
+        var dati = (c[3] || '').trim().replace(/^`+|`+$/g, '').trim();
+        terna.push({
+          nome: nome,
+          raro: raro,
+          effettoTesto: effettoTesto,
+          dati: dati,
+          effetti: splitToken(dati, ';')
+        });
+      }
+      if (terna.length !== 3) {
+        console.warn('PETQ.content: terna "' + stadio + '" di "' + nomePersonalita + '" ha ' + terna.length + ' talenti invece di 3');
+      }
+      out[stadio] = terna;
     }
 
     return out;

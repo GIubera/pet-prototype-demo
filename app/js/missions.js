@@ -369,6 +369,22 @@ window.PETQ = window.PETQ || {};
 
   // ---------- valutazione condizioni (stat effettiva = base + bonus passivi piazzati, cap 2) ----------
 
+  // Bonus passivo totale per stat = arredi piazzati (cap +2, v. arredi.bonusPassivi) + talenti
+  // attivi (passivo=stat+N, nessun cap dedicato, v. talenti.js bonusStatTutte). Le condizioni
+  // missione (requisiti stat) devono vedere la stat "vera" del pet incluso QUALSIASI bonus
+  // passivo, non solo quello degli arredi: stesso principio del GDD "niente spoiler alla
+  // scelta" applicato in modo coerente a tutte le fonti di bonus permanente.
+  function bonusStatCombinato(state) {
+    var daArredi = (PETQ.arredi && PETQ.arredi.bonusPassivi) ? PETQ.arredi.bonusPassivi(state) : {};
+    var daTalenti = (PETQ.talenti && PETQ.talenti.bonusStatTutte) ? PETQ.talenti.bonusStatTutte(state) : {};
+    var somma = { forza: 0, intelligenza: 0, velocita: 0, carisma: 0 };
+    for (var i = 0; i < STAT_NOMI.length; i++) {
+      var s = STAT_NOMI[i];
+      somma[s] = (daArredi[s] || 0) + (daTalenti[s] || 0);
+    }
+    return somma;
+  }
+
   function statEffettiva(pet, bonusStat, nomeStat) {
     var base = (pet && pet.rpg && typeof pet.rpg[nomeStat] === 'number') ? pet.rpg[nomeStat] : 0;
     var bonus = (bonusStat && typeof bonusStat[nomeStat] === 'number') ? bonusStat[nomeStat] : 0;
@@ -630,7 +646,7 @@ window.PETQ = window.PETQ || {};
       return { ok: false, msg: 'Scheda missione non trovata.' };
     }
 
-    var bonusStat = PETQ.arredi.bonusPassivi(state);
+    var bonusStat = bonusStatCombinato(state);
     var perks = PETQ.arredi.perkAttivi(state);
     var esito = scegliEsito(scheda, state.pet, bonusStat, perks);
 
@@ -696,6 +712,7 @@ window.PETQ = window.PETQ || {};
     risolvi: risolvi,
     tutorialDaProporre: tutorialDaProporre,
     risolviTutorial: risolviTutorial,
+    bonusStatCombinato: bonusStatCombinato,
     _valutaCond: _valutaCond,
     _scegliEsito: scegliEsito,
     _applicaCooldown: applicaCooldown,

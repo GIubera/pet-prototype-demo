@@ -686,8 +686,15 @@ window.PETQ = window.PETQ || {};
       hud.appendChild(fer);
     }
 
-    var monete = el('div', 'petq-monete', 'Monete: ' + state.coins);
-    hud.appendChild(monete);
+    // Riga monete + bottone Scheda (PROTOTIPO-2.md punto 3/Blocco 9, "priorita' alta, ben
+    // visibile"): stessa riga, cosi' l'accesso e' sempre a portata di tap dall'HUD in
+    // qualsiasi stanza, senza aggiungere una sesta tab dedicata.
+    var rigaMonete = el('div', 'petq-riga-monete');
+    rigaMonete.appendChild(el('span', 'petq-monete', 'Monete: ' + state.coins));
+    var schedaBtn = el('button', 'petq-btn petq-btn-mini petq-btn-scheda', 'Scheda');
+    schedaBtn.addEventListener('click', function () { mostraScheda(currentState); });
+    rigaMonete.appendChild(schedaBtn);
+    hud.appendChild(rigaMonete);
   }
 
   // Orologio di gioco nell'HUD (GDD "Casa" -> orologio in-game): HH:MM da PETQ.clock.oraGioco
@@ -965,8 +972,9 @@ window.PETQ = window.PETQ || {};
     return sec + 's';
   }
 
-  // valore stat RPG del pet: base + bonus passivi degli arredi piazzati (già cappati da arredi.js).
-  // state opzionale (default: quello corrente) per i test di logica.
+  // valore stat RPG del pet: base + bonus passivi degli arredi piazzati (già cappati da
+  // arredi.js) + bonus passivi dei talenti attivi (PROTOTIPO 2, Blocco 9, v. talenti.js
+  // bonusStat, nessun cap dedicato). state opzionale (default: quello corrente) per i test.
   function statConBonus(nomeStat, state) {
     var st = state || currentState;
     var base = (st && st.pet && st.pet.rpg &&
@@ -974,7 +982,10 @@ window.PETQ = window.PETQ || {};
     var bonus = 0;
     if (st && PETQ.arredi && PETQ.arredi.bonusPassivi) {
       var b = PETQ.arredi.bonusPassivi(st);
-      if (b && typeof b[nomeStat] === 'number') bonus = b[nomeStat];
+      if (b && typeof b[nomeStat] === 'number') bonus += b[nomeStat];
+    }
+    if (st && PETQ.talenti && PETQ.talenti.bonusStat) {
+      bonus += PETQ.talenti.bonusStat(st, nomeStat);
     }
     return { base: base, bonus: bonus, tot: base + bonus };
   }
@@ -2896,6 +2907,112 @@ window.PETQ = window.PETQ || {};
     document.body.appendChild(overlay);
   }
 
+  // ==================== SCHEDA PERSONAGGIO (PROTOTIPO-2.md punto 3 / Blocco 9) ====================
+  // "Priorita' alta, ben visibile": schermata tipo scheda gdr che riassume nome, razza/stadio/
+  // personalita', le 5 barre benessere, le 4 stat RPG (base + bonus arredi/talenti gia'
+  // calcolato da statConBonus), i talenti presi (pallino rarita' + effetto + da quale stadio) e
+  // i perk di categoria attivi dagli arredi piazzati. Overlay "a foglio" come mostraDiario: NON
+  // resetta currentStanza, "Chiudi" si limita a rimuovere il nodo cosi' si resta esattamente
+  // dov'era la casa (qualunque stanza/tab fosse aperta quando si e' premuto "Scheda").
+  var RAZZA_LABEL = { robot: 'Robot', alieno: 'Alieno' };
+  var SOTTORAZZA_LABEL = { blob: 'Blob', insettoide: 'Mantide-folk', rettiliano: 'Lizardfolk' };
+  var STADIO_LABEL = { baby: 'Baby', teen: 'Teen' };
+  var PERSONALITA_LABEL = { gentile: 'Gentile', maleducato: 'Maleducato', nerd: 'Nerd', sportivo: 'Sportivo' };
+  var PERK_CATEGORIA_LABEL = { videogioco: 'Player One (Videogioco)', combattimento: 'Street Fighter (Combattimento)', sport: 'Tony Hawk (Sport)' };
+
+  function mostraScheda(state) {
+    if (!state || !state.pet) return;
+    var esistente = document.getElementById('petq-scheda-overlay');
+    if (esistente) esistente.remove();
+
+    var overlay = el('div', 'petq-scheda-overlay');
+    overlay.id = 'petq-scheda-overlay';
+
+    var pagina = el('div', 'petq-scheda-pagina');
+    var pet = state.pet;
+
+    var razzaTxt = RAZZA_LABEL[pet.razza] || pet.razza || '?';
+    if (pet.sottorazza) razzaTxt += ' (' + (SOTTORAZZA_LABEL[pet.sottorazza] || pet.sottorazza) + ')';
+    pagina.appendChild(el('h2', 'petq-scheda-titolo', pet.nome || 'Il tuo pet'));
+    pagina.appendChild(el('p', 'petq-scheda-sottotitolo',
+      razzaTxt + ' · ' + (STADIO_LABEL[pet.stadio] || pet.stadio) + ' · ' + (PERSONALITA_LABEL[pet.personalita] || pet.personalita)));
+
+    // ---- Stat benessere (5 barre, stesso stile dell'HUD) ----
+    pagina.appendChild(el('h3', 'petq-scheda-sezione', 'Benessere'));
+    var barre = [
+      ['Fame', pet.stats.fame], ['Igiene', pet.stats.igiene], ['Salute', pet.stats.salute],
+      ['Felicità', pet.stats.felicita], ['Energia', pet.stats.energia]
+    ];
+    for (var i = 0; i < barre.length; i++) {
+      var val = Math.round(barre[i][1]);
+      var riga = el('div', 'petq-barra-riga');
+      riga.appendChild(el('span', 'petq-barra-label', barre[i][0]));
+      var traccia = el('div', 'petq-barra-traccia');
+      var fill = el('div', 'petq-barra-fill ' + coloreBarra(val));
+      fill.style.width = val + '%';
+      traccia.appendChild(fill);
+      riga.appendChild(traccia);
+      riga.appendChild(el('span', 'petq-barra-val', String(val)));
+      pagina.appendChild(riga);
+    }
+
+    // ---- Stat RPG (base + bonus arredi/talenti, es. "Forza 3 (+2)") ----
+    pagina.appendChild(el('h3', 'petq-scheda-sezione', 'Statistiche'));
+    var statRpg = el('div', 'petq-scheda-rpg');
+    for (var s = 0; s < PROPS_ALLENAMENTO.length; s++) {
+      var propS = PROPS_ALLENAMENTO[s];
+      var rigaS = el('div', 'petq-scheda-rpg-riga');
+      rigaS.appendChild(el('span', 'petq-scheda-rpg-label', propS.label));
+      rigaS.appendChild(el('span', 'petq-scheda-rpg-val', testoStat(propS.stat, state)));
+      statRpg.appendChild(rigaS);
+    }
+    pagina.appendChild(statRpg);
+
+    // ---- Talenti presi (nome, pallino rarita', effetto breve, stadio) ----
+    pagina.appendChild(el('h3', 'petq-scheda-sezione', 'Talenti'));
+    var talenti = (PETQ.talenti && PETQ.talenti.talentiAttivi) ? PETQ.talenti.talentiAttivi(state) : [];
+    if (talenti.length === 0) {
+      pagina.appendChild(el('p', 'petq-scheda-vuoto', 'Nessun talento ancora (in attesa della nascita/evoluzione).'));
+    } else {
+      for (var t = 0; t < talenti.length; t++) {
+        var tal = talenti[t];
+        var rigaTal = el('div', 'petq-scheda-talento');
+        var pallino = el('span', 'petq-talento-pallino ' + (tal.raro ? 'petq-talento-raro' : 'petq-talento-normale'));
+        pallino.title = tal.raro ? 'Raro' : 'Normale';
+        rigaTal.appendChild(pallino);
+        var testoWrap = el('div', 'petq-talento-testo');
+        testoWrap.appendChild(el('div', 'petq-talento-nome', tal.nome + ' (' + (STADIO_LABEL[tal.stadio] || tal.stadio) + ')'));
+        testoWrap.appendChild(el('div', 'petq-talento-effetto', tal.effettoTesto || ''));
+        rigaTal.appendChild(testoWrap);
+        pagina.appendChild(rigaTal);
+      }
+    }
+
+    // ---- Perk di categoria attivi (da arredi piazzati) ----
+    pagina.appendChild(el('h3', 'petq-scheda-sezione', 'Perk di categoria'));
+    var perks = (PETQ.arredi && PETQ.arredi.perkAttivi) ? PETQ.arredi.perkAttivi(state) : [];
+    if (perks.length === 0) {
+      pagina.appendChild(el('p', 'petq-scheda-vuoto', 'Nessun perk attivo: piazza gli arredi giusti in casa.'));
+    } else {
+      var listaPerk = el('div', 'petq-scheda-perklist');
+      for (var p = 0; p < perks.length; p++) {
+        listaPerk.appendChild(el('span', 'petq-scheda-perk', PERK_CATEGORIA_LABEL[perks[p]] || capitalize(perks[p])));
+      }
+      pagina.appendChild(listaPerk);
+    }
+
+    var chiudiBtn = el('button', 'petq-btn petq-btn-primario', 'Chiudi');
+    chiudiBtn.addEventListener('click', function () { overlay.remove(); });
+    pagina.appendChild(chiudiBtn);
+
+    overlay.appendChild(pagina);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    document.body.appendChild(overlay);
+  }
+
   // slot nei testi esito: {oggetto} = il primo arredo/arma dei reward (tutorial M0), {nome} = pet
   function risolviSlotEsito(testo, esito) {
     if (!testo) return '';
@@ -3230,6 +3347,25 @@ window.PETQ = window.PETQ || {};
     });
     panel.appendChild(evolviBtn);
 
+    // Debug "Ri-tira talenti" (PROTOTIPO-2.md Blocco 9): ri-estrae da capo i talenti del pet
+    // rispettando lo stadio attuale (1 se baby, 2 se teen), per provare combinazioni diverse
+    // senza dover far rinascere/evolvere il pet. Aggiorna subito la scheda se e' aperta.
+    var ritiraTalentiBtn = el('button', 'petq-btn petq-btn-mini', 'Ri-tira talenti');
+    ritiraTalentiBtn.addEventListener('click', function () {
+      if (!currentState || !currentState.pet || !PETQ.pet || !PETQ.pet.ritiraTalenti) return;
+      var ok = PETQ.pet.ritiraTalenti(currentState.pet);
+      if (!ok) {
+        mostraToast('Talenti non disponibili (content non ancora caricato?).');
+        return;
+      }
+      PETQ.save.save(currentState);
+      aggiornaHud(currentState);
+      var nomi = currentState.pet.talenti.map(function (t) { return t.nome + (t.raro ? ' (raro)' : ''); }).join(', ');
+      mostraToast('Nuovi talenti: ' + (nomi || 'nessuno'));
+      if (document.getElementById('petq-scheda-overlay')) mostraScheda(currentState);
+    });
+    panel.appendChild(ritiraTalentiBtn);
+
     var resetBtn = el('button', 'petq-btn petq-btn-mini petq-btn-danger', 'Reset save');
     resetBtn.addEventListener('click', function () {
       PETQ.save.reset();
@@ -3259,7 +3395,8 @@ window.PETQ = window.PETQ || {};
     _mappaDisponibile: mappaDisponibile,
     _statConBonus: statConBonus,
     _testoStat: testoStat,
-    _nomiArrediPiazzati: nomiArrediPiazzati
+    _nomiArrediPiazzati: nomiArrediPiazzati,
+    mostraScheda: mostraScheda
   };
 
 })();

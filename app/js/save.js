@@ -82,6 +82,28 @@ window.PETQ = window.PETQ || {};
     if (typeof state.gameMinutes !== 'number' && window.PETQ.clock && window.PETQ.clock.inizializzaOrologio) {
       window.PETQ.clock.inizializzaOrologio(state);
     }
+
+    // Migrazione Talenti (PROTOTIPO 2, Blocco 9): i salvataggi pre-esistenti non hanno
+    // pet.talenti. Scelta di design DOCUMENTATA (non c'e' una decisione esplicita del fondatore
+    // su questo caso, e' la piu' semplice/coerente): invece di lasciare il pet "senza talenti
+    // per sempre", si assegna RETROATTIVAMENTE come se il pet li avesse gia' vinti — 1 (nascita)
+    // sempre, +1 (teen) se il pet e' gia' teen — cosi' un salvataggio vecchio non resta escluso
+    // dal sistema. Stessa regola duplicata in main.js migraState (pattern gia' usato per le
+    // altre migrazioni di questo file, es. negozioSbloccato/energia).
+    if (state.pet && !Array.isArray(state.pet.talenti)) {
+      state.pet.talenti = [];
+      if (window.PETQ.talenti && typeof window.PETQ.talenti.estrai === 'function') {
+        var talentoNascita = window.PETQ.talenti.estrai(state.pet.personalita, 'nascita');
+        if (talentoNascita) state.pet.talenti.push(talentoNascita);
+        if (state.pet.stadio === 'teen') {
+          var talentoTeen = window.PETQ.talenti.estrai(state.pet.personalita, 'teen');
+          if (talentoTeen) state.pet.talenti.push(talentoTeen);
+        }
+      }
+      // se PETQ.talenti non e' ancora pronto a questo punto del boot (dipende dall'ordine di
+      // caricamento script), pet.talenti resta [] per ora: non e' un problema bloccante, il
+      // prossimo save.load (o un giro di "Ri-tira talenti" in debug) puo' rimediare.
+    }
   }
 
   function save(state) {
