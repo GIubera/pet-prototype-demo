@@ -124,6 +124,8 @@ window.PETQ = window.PETQ || {};
     }
     if (typeof state.valigia === 'undefined') state.valigia = null;
     if (typeof state.petPartito === 'undefined') state.petPartito = null;
+    // Lettera dal pianeta (Blocco 4): v. save.js (stessa regola duplicata).
+    if (typeof state.letteraPartito === 'undefined') state.letteraPartito = null;
     if (typeof state.eventoValigia === 'undefined') state.eventoValigia = null;
 
     // Migrazione orologio di gioco (fix "sonno + orologio"): i salvataggi che non conoscono

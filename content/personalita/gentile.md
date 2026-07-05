@@ -128,6 +128,12 @@ Voce: dolce, premuroso, un filo appiccicoso. Si scusa anche quando non serve.
 - Vado, {utente}. Ti lascio il posto migliore sul divano: il mio. Trattalo bene.
 - L'ultima cosa che faccio qui è dire grazie. La penultima era piangere un pochino. Non guardare.
 
+## Lettera (dal pianeta dei ritirati)
+- [ESEMPIO] Caro {utente}, qui si sta bene, dicono. Io però conto ancora i minuti come facevo con te. Sono a 8.940. Torno a zero se vieni.
+- [ESEMPIO] Ti scrivo dal pianeta. C'è un divano anche qui, ma non ha la tua forma. Il mio posto resta accanto a te, se lo rivuoi.
+- [ESEMPIO] Non è colpa tua, lo giuro. È solo che di notte guardo le stelle e cerco la finestra di casa. Non la trovo. Aiutami a tornare?
+- [ESEMPIO] Ho imparato a fare la valigia, alla fine. Peccato averlo imparato per andarmene. La disferei subito, {utente}. Dimmi solo di sì.
+
 ## Evoluzione
 - Guardami, sono alto! Ora posso abbracciarti meglio. Era il mio obiettivo segreto.
 - Da oggi sono grande. Ma resto il tuo {nome}, eh. Quello non evolve mai.

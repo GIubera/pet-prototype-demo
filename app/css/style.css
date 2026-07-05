@@ -1139,3 +1139,40 @@ button {
 .petq-partito .petq-hint {
   max-width: 340px;
 }
+
+/* LETTERA dal pianeta (Blocco 4): pannello "foglio", stesso look carta del diario ma inline
+   nella schermata pet-partito (non un overlay). Bordo leggermente "spiegazzato". */
+.petq-lettera {
+  background: #f4efe2;
+  color: #3a3020;
+  border-radius: 8px;
+  padding: 16px 18px;
+  max-width: 340px;
+  width: 100%;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid #d8cdae;
+}
+
+.petq-lettera-titolo {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  text-align: center;
+  color: #3a3020;
+  border-bottom: 1px solid #c9bfa2;
+  padding-bottom: 8px;
+}
+
+.petq-lettera-riga {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  line-height: 1.55;
+  font-style: italic;
+}
+
+.petq-lettera-firma {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  text-align: right;
+  color: #6a5f45;
+}

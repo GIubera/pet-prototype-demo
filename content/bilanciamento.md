@@ -92,17 +92,17 @@ Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 3 
 
 **Cooldown missioni** (playtest 4 lug 2026): una missione completata è esclusa dalla rosa per **3 giorni** (traccia data ultima esecuzione per id). Se le missioni disponibili scendono sotto la dimensione della rosa, si riammettono le completate più vecchie fino a riempirla — la rosa non è mai vuota. Numero tarabile.
 
-**Perk per categoria** — arredo piazzato = niente fallimento e sempre super successo nella sua categoria (o tag). Effetto booleano. **I perk esistono SOLO nelle missioni che li assegnano** (decisione fondatore: se ogni categoria ne avesse uno non sarebbero speciali). Nel prototipo (P2):
+**Perk** — arredo piazzato in casa = effetto sempre attivo. I perk di categoria/tag sono booleani (niente fallimento + sempre super successo); Popeye è invece un passivo. **I perk esistono SOLO nelle missioni che li assegnano** (decisione fondatore: se ogni categoria ne avesse uno non sarebbero speciali). Regola di scrittura: quando si nomina un perk va SEMPRE scritto anche cosa fa. Nel prototipo (P2):
 
-| Categoria / tag | Nome perk | Da dove viene |
-|---|---|---|
-| Videogioco | Player One | M1, Coppa Arcade |
-| Combattimento | Street Fighter | M3, Completo da martial artist |
-| Sport | Tony Hawk | M8, Pattini da gara |
-| Studio | Doc Brown | M9, Coppa della Fiera |
-| tag `gara` | Sabotatore | M10, Telecomando Pirata — vale su TUTTE le missioni tag `gara` (overlap con Player One/Street Fighter/Tony Hawk innocuo, decisione fondatore 5 lug) |
-| tag `inseguimento` | Parkour Master | M15, Scarpe da Parkour |
-| passivo (verdure→Forza) | Popeye / Braccio di Ferro | M13, Trofeo d'Oro — NON è un vinci-categoria: mangiando verdure il pet prende anche +1 Forza. In IT il perk si chiama "Braccio di Ferro" |
+| Nome perk | Categoria / tag | Effetto (finché l'arredo è piazzato) | Da dove viene |
+|---|---|---|---|
+| Player One | Videogioco | niente fallimento + sempre super successo nelle missioni Videogioco | M1, Coppa Arcade |
+| Street Fighter | Combattimento | niente fallimento + sempre super successo nelle missioni Combattimento | M3, Completo da martial artist |
+| Tony Hawk | Sport | niente fallimento + sempre super successo nelle missioni Sport | M8, Pattini da gara |
+| Doc Brown | Studio | niente fallimento + sempre super successo nelle missioni Studio | M9, Coppa della Fiera |
+| Sabotatore | tag `gara` | niente fallimento + sempre super successo in TUTTE le missioni col tag `gara` (overlap con altri perk innocuo) | M10, Telecomando Pirata |
+| Parkour Master | tag `inseguimento` | niente fallimento + sempre super successo nelle missioni col tag `inseguimento` | M15, Scarpe da Parkour |
+| Popeye (IT: Braccio di Ferro) | passivo | NON vinci-categoria: ogni volta che il pet mangia verdure prende anche +1 Forza | M13, Trofeo d'Oro |
 
 Sociale e Consegne non hanno ancora perk. (Nota release EN: nomi-citazione da rivalutare — parodia o storpiatura, es. "Street Brawler".)
 

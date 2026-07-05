@@ -518,6 +518,9 @@ window.PETQ = window.PETQ || {};
       valigiaTrig: { fel: 0, sal: 0, doppio: 0 },
       valigia: null,
       petPartito: null,
+      // Lettera dal pianeta (Blocco 4): assemblata una volta quando il pet e' partito e mostrata
+      // stabile finche' e' via ({ personalita, righe }). Azzerata al recupero (eseguiAmmenda).
+      letteraPartito: null,
       eventoValigia: null
     };
     // orologio di gioco: parte dall'ora REALE corrente (stessa regola di migrazione dei
@@ -3545,10 +3548,12 @@ window.PETQ = window.PETQ || {};
     g.fill();
   }
 
-  // Schermata "pet partito" (Blocco 2, recupero minimo): la casa senza pet. Mostra il nome del
-  // pet partito + un bottone "Fai ammenda" (costo 50 monete) che lo riporta a casa. Il PIANETA
-  // visitabile e la LETTERA sono un batch successivo: qui basta questo perche' il gioco non
-  // resti in stato rotto. Overlay pieno (app.innerHTML) come mostraAddio/mostraEvoluzione.
+  // Schermata "PET PARTITO" arricchita (Blocco 4, versione semplice): il pet e' su un PIANETA/
+  // STAZIONE (scena pixel PETQ.sprites.drawPianeta) e ha mandato una LETTERA (pannello "foglio"
+  // stile diario, testo assemblato da componiLettera in voce di personalita'). Sotto, il bottone
+  // "Fai ammenda (50 monete)" gia' esistente (riusa eseguiAmmenda). Overlay pieno (app.innerHTML)
+  // come mostraAddio/mostraEvoluzione. La lettera e' assemblata UNA volta e salvata in
+  // state.letteraPartito, cosi' resta stabile finche' il pet e' via (non ri-pesca ad ogni apertura).
   function mostraPetPartito(state) {
     fermaIdle();
     puliziaEffetto();
@@ -3566,17 +3571,34 @@ window.PETQ = window.PETQ || {};
 
     var wrap = el('div', 'petq-screen petq-partito');
     wrap.id = 'petq-pet-partito';
-    wrap.appendChild(el('h1', 'petq-title', 'Casa vuota'));
+    var razza = pet.razza === 'robot' ? 'robot' : 'alieno';
+    wrap.appendChild(el('h1', 'petq-title', razza === 'robot' ? 'Alla stazione' : 'Su un altro pianeta'));
 
+    // SCENA PIANETA col pet partito
     var cart = document.createElement('canvas');
     cart.width = ROOM_W;
     cart.height = ROOM_H;
     cart.className = 'petq-cartolina';
     wrap.appendChild(cart);
-    disegnaCasaVuota(cart, state);
+    if (PETQ.sprites && PETQ.sprites.drawPianeta) {
+      PETQ.sprites.drawPianeta(cart, pet, { razza: razza, corpo: pet.corpo });
+    }
 
     wrap.appendChild(el('p', 'petq-esito-testo',
-      (pet.nome || 'Il tuo pet') + ' se n\'è andato. La casa è silenziosa senza di lui.'));
+      (pet.nome || 'Il tuo pet') + (razza === 'robot'
+        ? ' è al centro di manutenzione, in orbita. Ti ha scritto.'
+        : ' è tornato sul suo pianeta. Ti ha scritto.')));
+
+    // LETTERA: pannello "foglio" (stile diario). Testo assemblato una volta e salvato in
+    // state.letteraPartito cosi' resta stabile finche' il pet e' via.
+    var lettera = componiLettera(state);
+    var foglio = el('div', 'petq-lettera');
+    foglio.appendChild(el('h2', 'petq-lettera-titolo', 'Lettera da ' + (pet.nome || 'lui')));
+    for (var i = 0; i < lettera.length; i++) {
+      foglio.appendChild(el('p', 'petq-lettera-riga', lettera[i]));
+    }
+    foglio.appendChild(el('p', 'petq-lettera-firma', '— ' + (pet.nome || 'il tuo pet')));
+    wrap.appendChild(foglio);
 
     var costo = (PETQ.pet && typeof PETQ.pet._costoAmmenda === 'number') ? PETQ.pet._costoAmmenda : 50;
     var haMonete = (state.coins || 0) >= costo;
@@ -3596,22 +3618,64 @@ window.PETQ = window.PETQ || {};
     montaDebugPanel();
   }
 
-  // Casa vuota: la stanza salone senza il pet (accenno visivo). Riusa PETQ.rooms.draw sul salone
-  // col tema della razza del pet partito, cosi' si vede "la sua casa" ma vuota.
-  function disegnaCasaVuota(canvas, state) {
-    var g = canvas.getContext('2d');
-    g.imageSmoothingEnabled = false;
+  // Assembla la LETTERA del pet partito (Blocco 4). Pesca 1-2 frammenti dal pool 'lettera' della
+  // personalita' (fallback al pool 'addio' se 'lettera' e' vuoto), con gli slot riempiti come
+  // ogni battuta. Assemblata UNA sola volta e memorizzata in state.letteraPartito: le aperture
+  // successive (e un reload) mostrano la stessa lettera, non una nuova estrazione, finche' il pet
+  // e' via. Azzerata dal recupero (faiAmmenda svuota petPartito -> eseguiAmmenda pulisce anche
+  // letteraPartito). Ritorna un array di righe (>=1).
+  function componiLettera(state) {
     var pet = state.petPartito;
-    var tema = (pet && pet.razza === 'robot') ? 'lab' : 'ship';
-    if (PETQ.rooms && PETQ.rooms.draw) {
-      PETQ.rooms.draw(canvas, tema, 'salone', { poop: 0, arredi: [] });
-    } else {
-      g.fillStyle = '#2b303c';
-      g.fillRect(0, 0, ROOM_W, ROOM_H);
+    if (!pet) return [];
+    // gia' assemblata per QUESTO pet partito: riusala stabile.
+    if (state.letteraPartito && state.letteraPartito.righe && state.letteraPartito.righe.length) {
+      return state.letteraPartito.righe;
     }
-    // velo scuro per dare il senso di "vuoto/spento"
-    g.fillStyle = 'rgba(10,12,18,0.35)';
-    g.fillRect(0, 0, ROOM_W, ROOM_H);
+
+    var data = PETQ.content && PETQ.content.data;
+    var personalita = pet.personalita || 'gentile';
+    var pools = data && data.personalita && data.personalita[personalita];
+    var pool = (pools && pools.lettera && pools.lettera.length) ? pools.lettera
+             : (pools && pools.addio ? pools.addio : []);
+
+    var righe = [];
+    if (pool && pool.length) {
+      // 1-2 frammenti distinti (2 se il pool ne ha almeno 2), riempiti degli slot.
+      var quanti = pool.length >= 2 ? 2 : 1;
+      var indici = [];
+      var tentativi = 0;
+      while (indici.length < quanti && tentativi < 20) {
+        var k = Math.floor((PETQ.rng ? PETQ.rng.rand() : Math.random()) * pool.length);
+        if (indici.indexOf(k) === -1) indici.push(k);
+        tentativi++;
+      }
+      for (var j = 0; j < indici.length; j++) {
+        righe.push(riempiSlotLettera(pool[indici[j]], pet, state));
+      }
+    }
+    if (righe.length === 0) {
+      // fallback estremo se non c'e' proprio nessun contenuto (contenuti non caricati)
+      righe.push((pet.nome || 'Il tuo pet') + ' ti pensa dal pianeta. Torna a prenderlo.');
+    }
+
+    state.letteraPartito = { personalita: personalita, righe: righe };
+    if (PETQ.save && PETQ.save.save) PETQ.save.save(state);
+    return righe;
+  }
+
+  // Riempimento slot per la lettera. dialog.say gestisce gli slot internamente ma sceglie ANCHE
+  // la battuta (e puo' deviare su 'parola'): qui abbiamo gia' scelto il frammento, quindi
+  // riempiamo solo gli slot noti {nome}/{utente}/{parola} con lo stesso criterio di dialog.js.
+  function riempiSlotLettera(testo, pet, state) {
+    var nome = (pet && pet.nome) ? pet.nome : '...';
+    var parola = 'boh';
+    if (state && state.parole && state.parole.length > 0 && PETQ.rng) {
+      parola = PETQ.rng.pick(state.parole) || 'boh';
+    }
+    return String(testo)
+      .replace(/\{nome\}/g, nome)
+      .replace(/\{utente\}/g, 'capo')
+      .replace(/\{parola\}/g, parola);
   }
 
   function eseguiAmmenda() {
@@ -3623,6 +3687,9 @@ window.PETQ = window.PETQ || {};
       mostraPetPartito(currentState);
       return;
     }
+    // il pet e' tornato: la lettera dal pianeta non ha piu' senso, azzerala (cosi' una futura
+    // partenza ne assembla una nuova e fresca).
+    currentState.letteraPartito = null;
     PETQ.save.save(currentState);
     mostraToast(res.msg);
     // pet ripristinato: torna alla casa e mostra la battuta 'rientro'.

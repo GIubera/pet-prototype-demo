@@ -131,6 +131,12 @@ Voce: energia infinita, tutto è un allenamento o una gara, motivational coach a
 - L'ultimo fischio è arrivato. Grazie per le stagioni belle. Le altre le dimentico io, per tutti e due.
 - Mi ritiro da questa squadra, non dallo sport. Se un giorno riapri lo stadio... io tifavo per te.
 
+## Lettera (dal pianeta dei ritirati)
+- [ESEMPIO] Coach, ti scrivo dallo spogliatoio del pianeta. Mi alleno ogni giorno per la partita di ritorno. Manca solo che tu mi richiami in squadra.
+- [ESEMPIO] Qui il campo è liscio, gli avversari scarsi. Vinco sempre e non è divertente. Con te perdevo pure, ma almeno c'era la sfida. Mi richiami, {utente}?
+- [ESEMPIO] Numero di maglia ancora appeso al chiodo. Non l'ho dato a nessuno. È il tuo posto in panchina che aspetta il mio: firmiamo il ritorno?
+- [ESEMPIO] Il pianeta è la panchina, {utente}. Io voglio il campo, con te che urli dagli spalti. Fischia l'inizio: "Fai ammenda" e rientro in partita.
+
 ## Evoluzione
 - SONO CRESCIUTO! Categoria juniores, arrivo! Le gambe nuove vanno provate SUBITO.
 - Evoluto! Salto di categoria ufficiale. Il fisico c'era già, ora c'è anche il resto del fisico.

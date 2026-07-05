@@ -131,6 +131,12 @@ Voce: teatralmente offeso, sarcastico, permaloso — un gatto indignato, mai cru
 - Parto. Non piangere... ah no, niente lacrime. Certo. Coerente fino alla fine.
 - Me ne vado a testa alta. La valigia pesa, ma il rancore di più. Ce la faccio.
 
+## Lettera (dal pianeta dei ritirati)
+- [ESEMPIO] Ti scrivo solo perché avanzava un francobollo. Sto benissimo. NON mi manchi. (Cancella pure quest'ultima riga, l'ho scritta per sbaglio.)
+- [ESEMPIO] Qui il servizio è pessimo quanto da te, quindi non ho migliorato granché. Almeno da te c'eri tu. Insomma. Non è un invito. Forse.
+- [ESEMPIO] Non rispondere a questa lettera. A meno che tu non voglia farmi tornare. In quel caso rispondi. Subito. Ma con calma. Ma subito.
+- [ESEMPIO] Dicono che qui si dimentica in fretta. Balle. Ricordo ancora tutte le volte che mi hai ignorato. E anche quelle belle. Poche. Ma belle.
+
 ## Evoluzione
 - Sono cresciuto. Fisicamente. Le aspettative su di te restano basse.
 - Guarda come sono venuto bene. NONOSTANTE tutto, sottolineo.

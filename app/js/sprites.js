@@ -517,6 +517,141 @@ window.PETQ = window.PETQ || {};
     drawIcon(canvas, VALIGETTA_ICON);
   }
 
+  // ===== Scena PIANETA / STAZIONE dei ritirati (PROTOTIPO-2.md Blocco 4) =====
+  // Dove sta il pet PARTITO (state.petPartito): sfondo stellato, un pianetino (alieno, sul suo
+  // pianeta) o una stazione orbitante (robot, al centro di manutenzione) e il pet disegnato
+  // sopra in posa d'attesa/malinconica. Riusa lo sprite del pet via draw() su un canvas
+  // temporaneo, poi lo compone sulla scena (stesso pattern di disegnaScenaAddio in ui.js).
+  // "flavor": { razza, tinta, corpo } opzionale; se assente si deduce dalla razza del pet.
+  // La scena e' disegnata su base 112x64 (come le stanze) e scalata sul canvas passato.
+  var PIANETA_BASE_W = 112;
+  var PIANETA_BASE_H = 64;
+  var PIANETA_FLAVOR = {
+    alieno: { cielo: "#241a3a", pianeta: "#7a5cc0", pianetaOmbra: "#4d3a86", suolo: "#33265e", stazione: false },
+    robot: { cielo: "#141c2c", pianeta: "#3a4c66", pianetaOmbra: "#26384f", suolo: "#1e2838", stazione: true }
+  };
+
+  function drawPianeta(canvas, petLike, opts) {
+    if (!canvas || !petLike) return;
+    opts = opts || {};
+    var g = canvas.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    var sx = canvas.width / PIANETA_BASE_W;
+    var sy = canvas.height / PIANETA_BASE_H;
+    var needsScale = sx !== 1 || sy !== 1;
+    if (needsScale) { g.save(); g.scale(sx, sy); }
+    disegnaScenaPianeta(g, petLike, opts);
+    if (needsScale) g.restore();
+  }
+
+  // Disegno alla base 112x64 (il chiamante scala). Deterministico: le stelle usano una
+  // sequenza fissa (nessun rng) cosi' la scena e' identica a ogni ridisegno.
+  var STELLE = [
+    [8, 6], [20, 12], [34, 4], [48, 10], [60, 5], [74, 14], [88, 8], [100, 4],
+    [14, 22], [40, 18], [66, 24], [92, 20], [104, 30], [6, 34], [26, 30], [82, 32]
+  ];
+  function disegnaScenaPianeta(g, petLike, opts) {
+    var razza = (opts.razza || petLike.razza) === "robot" ? "robot" : "alieno";
+    var fl = PIANETA_FLAVOR[razza];
+    var W = PIANETA_BASE_W, H = PIANETA_BASE_H;
+
+    // cielo notturno
+    g.fillStyle = fl.cielo;
+    g.fillRect(0, 0, W, H);
+
+    // stelle (2 tinte, punti fissi)
+    for (var i = 0; i < STELLE.length; i++) {
+      g.fillStyle = (i % 3 === 0) ? "#fff6c8" : "#cfd8ff";
+      var s = (i % 4 === 0) ? 2 : 1;
+      g.fillRect(STELLE[i][0], STELLE[i][1], s, s);
+    }
+
+    if (fl.stazione) {
+      // ROBOT: stazione spaziale orbitante sullo sfondo (a destra, in alto)
+      disegnaStazione(g, 78, 8, fl);
+    } else {
+      // ALIENO: pianeta grande sullo sfondo (a destra, in alto)
+      disegnaPianetino(g, 86, 18, 16, fl);
+    }
+
+    // "terreno" in primo piano dove sta il pet (curva bassa a suolo)
+    g.fillStyle = fl.suolo;
+    // semplice collinetta: rettangolo di base + smusso agli angoli
+    g.fillRect(0, H - 14, W, 14);
+    g.fillStyle = fl.pianetaOmbra;
+    g.fillRect(0, H - 14, W, 2);
+
+    // il PET partito, in posa d'attesa al centro sul suolo. Riuso lo sprite in piedi (frame 0),
+    // corpo forzato a 'normale' e sporco off: e' "il ricordo" del pet, non lo stato di cura.
+    var petCanvas = document.createElement("canvas");
+    petCanvas.width = SIZE * 2;
+    petCanvas.height = SIZE * 2;
+    var petLike2 = {
+      razza: petLike.razza,
+      sottorazza: petLike.sottorazza,
+      parts: petLike.parts,
+      stadio: petLike.stadio || "teen",
+      corpo: opts.corpo || "normale",
+      sporco: false
+    };
+    draw(petCanvas, petLike2, { frame: 0 });
+    var pw = SIZE * 2;
+    var px = Math.round((W - pw) / 2);
+    var py = (H - 14) - pw + 4; // piedi appoggiati al suolo
+    g.drawImage(petCanvas, px, py);
+
+    // piccola "nuvoletta di malinconia": un sospiro sopra la testa (tre puntini che salgono)
+    g.fillStyle = "rgba(207,216,255,0.8)";
+    var hx = px + pw - 3;
+    var hy = py + 1;
+    g.fillRect(hx, hy, 2, 2);
+    g.fillRect(hx + 3, hy - 3, 2, 2);
+    g.fillRect(hx + 6, hy - 7, 3, 3);
+  }
+
+  // pianetino: cerchio pixel semplice con terminatore d'ombra + anello sottile
+  function disegnaPianetino(g, cx, cy, r, fl) {
+    for (var y = -r; y <= r; y++) {
+      for (var x = -r; x <= r; x++) {
+        if (x * x + y * y <= r * r) {
+          // meta' in ombra (lato destro/basso)
+          g.fillStyle = (x + y > r * 0.3) ? fl.pianetaOmbra : fl.pianeta;
+          g.fillRect(cx + x, cy + y, 1, 1);
+        }
+      }
+    }
+    // anello
+    g.strokeStyle = "rgba(255,255,255,0.25)";
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse ? g.ellipse(cx, cy, r + 5, 3, -0.3, 0, Math.PI * 2) : g.arc(cx, cy, r + 5, 0, Math.PI * 2);
+    g.stroke();
+  }
+
+  // stazione spaziale: corpo centrale + due pannelli solari + luce lampeggiante-fissa
+  function disegnaStazione(g, x, y, fl) {
+    // pannelli solari (bracci)
+    g.fillStyle = "#2a3d5c";
+    g.fillRect(x - 12, y + 4, 10, 6);
+    g.fillRect(x + 14, y + 4, 10, 6);
+    g.fillStyle = "#4a6fa0";
+    g.fillRect(x - 11, y + 5, 8, 1);
+    g.fillRect(x + 15, y + 5, 8, 1);
+    // corpo centrale
+    g.fillStyle = fl.pianeta;
+    g.fillRect(x - 2, y, 16, 12);
+    g.fillStyle = fl.pianetaOmbra;
+    g.fillRect(x - 2, y + 8, 16, 4);
+    // oblo'
+    g.fillStyle = "#bfe0ff";
+    g.fillRect(x + 2, y + 3, 3, 3);
+    g.fillRect(x + 8, y + 3, 3, 3);
+    // luce di segnalazione
+    g.fillStyle = "#ff6a6a";
+    g.fillRect(x + 5, y - 2, 2, 2);
+  }
+
   function normalizzaNome(nome) {
     return String(nome || "").toLowerCase().replace(/\s+/g, "");
   }
@@ -1071,6 +1206,7 @@ window.PETQ = window.PETQ || {};
     drawIdleProp: drawIdleProp,
     drawBoccaccia: drawBoccaccia,
     drawValigetta: drawValigetta,
+    drawPianeta: drawPianeta,
     drawCartolina: drawCartolina,
     _cartoline: Object.keys(SCENE),
     // topo amichevole riusabile fuori dalle cartoline (arredo "allenatore" nelle stanze)
