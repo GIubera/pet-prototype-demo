@@ -14,6 +14,7 @@ Bozza proposta da Claude, da rivedere in sessione design. Regola dal GDD: carne=
 | Biscotto | dolce | 6 | +10 | Carisma +1 | tanti dolci = ciccione |
 | Torta intera | dolce | 18 | +45 | Carisma +3 | rischio ciccione alto |
 | Fetta di torta | dolce | 10 | +15 | Carisma +1 | porzione ridotta della Torta intera, drop missione (M2 standard) |
+| Snack riciclato | verdura | 0 | +20 | Intelligenza +1 | inventato dal talento Inventore (Pool Inventore), non in vendita (costo 0 = non compare al Negozio) |
 
 Da decidere in sessione design:
 - Cibi trovabili nelle missioni (quali e con che rarità)

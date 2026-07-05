@@ -73,7 +73,7 @@ Nota di design: le missioni non sono mai bloccate dalla Salute bassa (filosofia 
 
 ## Missioni — pet baby (prototipo)
 
-Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 4 (su 8 schede, estrazione del giorno con copertura di almeno 3 stat diverse; il tutorial M0 è fuori rosa, solo giorno 1). Tre esiti deterministici:
+Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 3 (su 10+ schede, in crescita nel P2, estrazione del giorno con copertura di almeno 3 stat diverse; il tutorial M0 è fuori rosa, solo giorno 1). Tre esiti deterministici:
 
 | Esito | Frequenza | Come scatta |
 |---|---|---|
@@ -92,15 +92,17 @@ Niente tiro di dado. Il giocatore sceglie 1 missione al giorno da una rosa di 4 
 
 **Cooldown missioni** (playtest 4 lug 2026): una missione completata è esclusa dalla rosa per **3 giorni** (traccia data ultima esecuzione per id). Se le missioni disponibili scendono sotto la dimensione della rosa, si riammettono le completate più vecchie fino a riempirla — la rosa non è mai vuota. Numero tarabile.
 
-**Perk per categoria** — arredo piazzato = niente fallimento e sempre super successo nella sua categoria. Effetto booleano. **I perk esistono SOLO nelle missioni che li assegnano** (decisione fondatore: se ogni categoria ne avesse uno non sarebbero speciali). Nel prototipo sono tre:
+**Perk per categoria** — arredo piazzato = niente fallimento e sempre super successo nella sua categoria (o tag). Effetto booleano. **I perk esistono SOLO nelle missioni che li assegnano** (decisione fondatore: se ogni categoria ne avesse uno non sarebbero speciali). Nel prototipo (P2):
 
-| Categoria | Nome perk | Da dove viene |
+| Categoria / tag | Nome perk | Da dove viene |
 |---|---|---|
 | Videogioco | Player One | M1, Coppa Arcade |
 | Combattimento | Street Fighter | M3, Completo da martial artist |
 | Sport | Tony Hawk | M8, Pattini da gara |
+| Studio | Doc Brown | M9, Coppa della Fiera |
+| tag `gara` | Sabotatore | M10, Telecomando Pirata — vale sulle gare taggate SENZA perk di categoria proprio (esclude Videogioco/Sport) |
 
-Sociale, Studio e Consegne non hanno perk. (Nota release EN: nomi-citazione da rivalutare — parodia o storpiatura, es. "Street Brawler".)
+Sociale e Consegne non hanno ancora perk. (Nota release EN: nomi-citazione da rivalutare — parodia o storpiatura, es. "Street Brawler".)
 
 ## Arredi e bonus passivi (PROPOSTA)
 

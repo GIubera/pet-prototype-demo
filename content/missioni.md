@@ -1,10 +1,10 @@
-# Missioni — prototipo (8 schede + tutorial)
+# Missioni — prototipo (10 schede + tutorial)
 
 Chi compila: il fondatore definisce le schede (requisiti, durata, reward, condizioni); il socio scrive i testi degli esiti (qui in versione neutra, poi le varianti per personalità). Ogni scheda ha anche una riga "Scena" per chi disegnerà gli sprite di ogni esito.
 
-**Modello di risoluzione (pet baby, prototipo)** — niente tiro di dado, niente soglia probabilistica. Il giocatore sceglie 1 missione al giorno da una rosa di 3-4; quasi sempre l'esito è quello **standard** (è così che il pet cresce, punto). Fallimento e super successo sono code rare, deterministiche: scattano solo se il pet soddisfa la condizione scritta sulla scheda (di solito una personalità precisa, a volte insieme a una stat molto bassa/alta). Il fallimento non è mai un "meno secco": compensa sempre con qualcosa, possibilmente in tema con la missione. Dettagli del modello e vecchia formula probabilistica (fase adulta) in bilanciamento.md.
+**Modello di risoluzione (pet baby, prototipo)** — niente tiro di dado, niente soglia probabilistica. Il giocatore sceglie 1 missione al giorno da una rosa di 3; quasi sempre l'esito è quello **standard** (è così che il pet cresce, punto). Fallimento e super successo sono code rare, deterministiche: scattano solo se il pet soddisfa la condizione scritta sulla scheda (di solito una personalità precisa, a volte insieme a una stat molto bassa/alta). Il fallimento non è mai un "meno secco": compensa sempre con qualcosa, possibilmente in tema con la missione. Dettagli del modello e vecchia formula probabilistica (fase adulta) in bilanciamento.md.
 
-**Categorie & perk**: ogni missione ha una categoria (Videogioco, Sociale, Combattimento, Studio, Consegne, Sport). Alcuni super successi sbloccano un **perk**: un arredo che, finché è piazzato in casa, annulla il fallimento e garantisce sempre il super successo nelle missioni future della stessa categoria.
+**Categorie, tag & perk**: ogni missione ha una categoria (Videogioco, Sociale, Combattimento, Studio, Consegne, Sport) e opzionalmente uno o più **tag** trasversali (invenzione, natura, gara) usati dai talenti e da alcuni perk. Alcuni super successi sbloccano un **perk**: un arredo che, finché è piazzato in casa, annulla il fallimento e garantisce sempre il super successo nelle missioni future della stessa categoria — o dello stesso tag, come Sabotatore sulle gare senza perk proprio.
 
 ---
 
@@ -234,6 +234,73 @@ Dati: cond= velocita>=3 | sportivo ; reward= velocita+2, monete+20, arredo:Patti
 Testo: "Non stai nemmeno pattinando, a un certo punto — stai volando basso. Tagli il traguardo con un margine imbarazzante, e lo sponsor della gara ti regala un paio di pattini professionali dritti dalla vetrina."
 Scena: pet che taglia il traguardo con largo margine, pattini scintillanti
 
+## Missione 9: Fiera della Scienza del Quartiere
+- Luogo: 📍 Fiera della Scienza del Quartiere
+- Razza: entrambe
+- Categoria: Studio
+- Stat coinvolta: Intelligenza
+- Tag: invenzione
+- Durata: 4h
+- Costo: 5 monete
+- Dati: durata=4h ; costo=5 ; categoria=studio ; stat=int ; tag=invenzione
+
+**Standard** — +2 Int, +8 monete
+Dati: reward= int+2, monete+8
+Testo: "La Fiera della Scienza è un tripudio di cartelloni traballanti, esperimenti che fumano e ronzii sospetti. Presenti la tua invenzione a una giuria di quattro sapientoni con gli occhiali spessi: annuiscono, prendono appunti, uno ti fa pure una domanda difficile a cui rispondi al volo. Non vinci, ma esci con la testa più piena di quando sei entrato."
+Scena: pet davanti a un cartellone-esperimento, giuria di profilo che prende appunti
+
+**Fallimento** (condizione: Sportivo) — niente Int, Zuppa di verdure (cibo, Int+2)
+Dati: priorita=1 ; cond= sportivo ; reward= cibo:Zuppa di verdure
+Testo: "Cinque minuti tra formule e circuiti e già ti fischiano le orecchie: troppa roba da secchioni per i tuoi gusti. Ti defili verso il tavolo del rinfresco, dove almeno c'è della zuppa calda, e passi il resto della fiera a fare canestro con le palline di carta. Della scienza, oggi, non ti è entrato niente. Della zuppa sì."
+Scena: pet annoiato che si allontana dai cartelloni con una scodella di zuppa in mano
+
+**Fallimento** (condizione: Intelligenza ≤1) — +6 monete, +1 Int
+Dati: priorita=2 ; cond= int<=1 ; reward= monete+6, int+1
+Testo: "La tua invenzione, diciamo, aveva del potenziale. Peccato che a metà presentazione abbia iniziato a sfrigolare, poi a fumare, poi a spegnersi con un triste 'plop'. La giuria applaude per gentilezza e ti rimborsa le spese 'per l'impegno'. Qualcosa hai imparato, se non altro come NON si fa."
+Scena: pet imbarazzato accanto a un aggeggio che sputa fumo
+
+**Super successo** (condizione: Intelligenza 3+, o auto col talento Inventore via tag invenzione) — +3 Int, +15 monete, Coppa della Fiera (arredo raro, +1 Int passivo + perk Studio "Doc Brown": missioni Studio → niente fallimento e sempre super successo)
+Dati: cond= int>=3 ; reward= int+3, monete+15, arredo:Coppa della Fiera, perk:studio
+Testo: "Non stai presentando un'invenzione — stai presentando IL FUTURO, e la giuria lo capisce entro trenta secondi. Occhiali che si abbassano, appunti frenetici, applausi che partono da soli. Ti consegnano la Coppa della Fiera davanti a tutti, e uno dei giudici ti stringe la mano un po' troppo a lungo: 'ricordati di me quando sarai famoso'."
+Scena: pet che alza la Coppa della Fiera, giuria in piedi che applaude
+
+## Missione 10: Sfida Robotica
+- Luogo: 📍 Arena della Sfida Robotica
+- Razza: entrambe
+- Categoria: Studio
+- Stat coinvolta: Intelligenza
+- Tag: invenzione, gara
+- Durata: 2h
+- Costo: 3 monete
+- Dati: durata=2h ; costo=3 ; categoria=studio ; stat=int ; tag=invenzione,gara
+
+**Standard** — +1 Int, Coppa Robot Wars (arredo, +1 Int passivo)
+Dati: reward= int+1, arredo:Coppa Robot Wars
+Testo: "L'arena della Sfida Robotica è un quadrato di lamiera ammaccata dove piccoli robot fatti in casa si prendono a testate tra scintille e tifo isterico. Il tuo se la cava: qualche colpo dato, qualche ammaccatura presa, e un onorevole piazzamento a metà classifica. Ti porti a casa una coppa e un bel po' di nozioni su motori e ingranaggi."
+Scena: pet a bordo arena con un piccolo robot telecomandato, scintille
+
+**Fallimento** (condizione: Gentile) — niente Int, +1 Carisma, Insalatona (cibo, Int+1)
+Dati: priorita=1 ; cond= gentile ; reward= carisma+1, cibo:Insalatona
+Testo: "Arrivi in arena, guardi quei robottini che si prenderanno a mazzate... e proprio non te la senti. Sono troppo carini per finire a pezzi. Molli la gara, ti siedi coi tuoi 'avversari' a parlare di come li avete costruiti, e alla fine avete più amici che ammaccature. Non hai imparato a combattere, ma neanche volevi."
+Scena: pet seduto in cerchio con altri concorrenti e i loro robottini, atmosfera amichevole
+
+**Fallimento** (condizione: Intelligenza ≤1) — niente Int, Zuppa di verdure (cibo, Int+2)
+Dati: priorita=2 ; cond= int<=1 ; reward= cibo:Zuppa di verdure
+Testo: "Il tuo robot dura esattamente un round: parte storto, gira in tondo, poi si ferma di colpo come se ci avesse ripensato. Gli altri partecipanti, più che deriderti, ti guardano con pena e ti allungano una scodella di zuppa 'dai, la prossima va meglio'. Almeno mangi."
+Scena: pet accanto al suo robottino fermo e fumante, un altro concorrente gli porge del cibo
+
+**Super successo — Sabotaggio** (condizione: Maleducato + Intelligenza 2+) — +2 Int, Telecomando Pirata (arredo, +1 Velocità passivo + perk Sabotatore: nelle gare senza perk proprio → sempre super successo)
+Dati: priorita=1 ; cond= maleducato & int>=2 ; reward= int+2, arredo:Telecomando Pirata, perk:sabotatore
+Testo: "Mentre gli altri si concentrano sui loro robot, tu ti concentri su UN telecomando 'preso in prestito'. Due ritocchi ai loro ricevitori e all'improvviso i robottini avversari impazziscono, si girano contro i loro stessi padroni, si autodistruggono in un valzer di scintille. Vinci per abbandono. Nessuno ha capito niente, e tu tieni il telecomando."
+Scena: pet con un ghigno che smanetta un telecomando, robot avversari in tilt sullo sfondo
+
+**Super successo — Mecha-Bot** (condizione: Intelligenza 3+) — +2 Int, Mecha-Bot (arredo raro, +2 Forza passivo)
+Dati: priorita=2 ; cond= int>=3 ; reward= int+2, arredo:Mecha-Bot
+Testo: "Gli altri hanno portato robottini. Tu hai portato un MOSTRO. Il tuo Mecha-Bot spazza l'arena in tre mosse, e mentre gli avversari raccolgono i pezzi dei loro tu resti in piedi con le braccia incrociate. Te lo porti a casa — non è più un giocattolo, è un piccolo bestione da guerra che d'ora in poi ti rende più temibile."
+Scena: pet trionfante accanto a un robot grosso e minaccioso, rottami intorno
+
+Priorità super M10: Sabotaggio (Maleducato) prima di Mecha-Bot (generico Int 3+). Come per M7, il super batte sempre il fallimento: un Gentile con Int 3+ va in Mecha-Bot, non nel fallimento "fa amicizia".
+
 ---
 
 ## Backlog — concetti sviluppati ma non scelti (da riprendere in una sessione futura)
@@ -252,9 +319,9 @@ Scena: pet che taglia il traguardo con largo margine, pattini scintillanti
 
 ---
 
-## Linee guida di progetto (dal GDD, verificate su queste 8 schede)
-- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8), Carisma (M2, M6), Forza (M3, M5, M7), Intelligenza (M4) ✓
+## Linee guida di progetto (dal GDD, verificate su queste 10 schede)
+- 1-2 stat RPG coinvolte per missione; tutte e 4 servono: Velocità (M1, M5, M8), Carisma (M2, M6), Forza (M3, M5, M7), Intelligenza (M4, M9, M10) ✓
 - Durate tra 1 e 6 ore reali, con una corta ~1h (M1) ✓
 - Reward misti: monete, cibo, arredi, XP stat — mai solo monete ✓
 - Rischio igiene (M5) e salute (M3, M7) per far girare la loop di cura ✓
-- Rosa di 3-4 missioni/giorno su 8 disponibili + tutorial fuori rosa: abbastanza varietà per 2 giorni di test con rotazione ✓
+- Rosa di 3 missioni/giorno su 10+ disponibili + tutorial fuori rosa: varietà per i giorni baby con rotazione e cooldown 3 giorni ✓

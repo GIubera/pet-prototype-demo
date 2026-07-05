@@ -184,6 +184,13 @@ button {
   color: #2a0f14;
 }
 
+/* Bottone "Ruba (gratis)" nello shop (talento Cleptomane/Boss di Quartiere): tono "furtivo"
+   viola per distinguerlo dal "Compra" standard, senza confonderlo col rosso danger. */
+.petq-btn-ruba {
+  background: #9b6cff;
+  color: #16101f;
+}
+
 /* ---------- Casa ---------- */
 
 .petq-casa {

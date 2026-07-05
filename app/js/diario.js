@@ -67,8 +67,22 @@ window.PETQ = window.PETQ || {};
   // momento (Apertura, Cibo, Missione, Umore, Coccole, Chiusura), nell'ordine del brief.
   // Se un momento non ha frammenti disponibili la riga viene semplicemente omessa (mai una
   // pagina rotta o con placeholder brutti).
+  // Lock 1 diario/giorno (fix fondatore 5 lug 2026): la pagina si compone UNA volta per giorno
+  // DI GIOCO e resta fissa finché non cambia giorno (chiave = pet.giorniVita, che avanza a ogni
+  // "nuovo giorno"). Riclickare la scrivania mostra la STESSA pagina, non una nuova estrazione
+  // random. Al cambio giorno la chiave non combacia più e la pagina si ricompone (una sola volta).
+  function chiaveGiorno(state) {
+    return (state && state.pet && typeof state.pet.giorniVita === 'number') ? state.pet.giorniVita : 0;
+  }
+
   function componiPagina(state) {
-    var pet = state && state.pet;
+    if (!state) return [];
+    var giorno = chiaveGiorno(state);
+    if (state.diarioOggi && state.diarioOggi.giorno === giorno && Array.isArray(state.diarioOggi.righe)) {
+      return state.diarioOggi.righe;
+    }
+
+    var pet = state.pet;
     var personalita = (pet && pet.personalita) || 'gentile';
 
     var momenti = [
@@ -85,6 +99,8 @@ window.PETQ = window.PETQ || {};
       var riga = pescaFrammento(personalita, momenti[i], pet);
       if (riga) righe.push(riga);
     }
+
+    state.diarioOggi = { giorno: giorno, righe: righe };
     return righe;
   }
 

@@ -69,12 +69,14 @@ window.PETQ = window.PETQ || {};
       bilanciamento: null,
       missioni: [],
       diario: {},
-      talenti: {}
+      talenti: {},
+      poolInventore: []
     },
     load: load,
     _parseBilanciamento: parseBilanciamento, // esposto per test di parsing (pattern _get*/_assert* del codebase)
     _parseDiario: parseDiario,
-    _parseTalenti: parseTalenti
+    _parseTalenti: parseTalenti,
+    _parsePoolInventore: parsePoolInventore
   };
 
   function load(callback) {
@@ -104,6 +106,7 @@ window.PETQ = window.PETQ || {};
       data.missioni = parseMissioni(raw['missioni'] || '');
       data.diario = parseDiario(raw['diario'] || '');
       data.talenti = parseTalenti(raw['talenti'] || '');
+      data.poolInventore = parsePoolInventore(raw['talenti'] || '');
 
       var bilOk = null;
       try {
@@ -406,6 +409,53 @@ window.PETQ = window.PETQ || {};
       out[stadio] = terna;
     }
 
+    return out;
+  }
+
+  // ---------- parser Pool Inventore (talento Nerd raro "Inventore", content/talenti.md) ----------
+  // La sezione "## Pool Inventore ..." di talenti.md contiene una tabella | # | Oggetto | Effetto |
+  // con 7 righe. Ritorna [ { nome, effetto } x7 ] preservando l'ORDINE (l'invenzione settimanale
+  // pesca a caso da questo array, v. PETQ.talenti.applicaInvenzione). Non interpretiamo qui gli
+  // effetti (testo libero "+30 Energia subito", "arredo, +1 Int passivo", ecc.): l'interpretazione
+  // e' in talenti.js applicaInvenzione, cosi' il parser resta puramente strutturale come per i
+  // talenti (che espongono la colonna Dati grezza, non gia' risolta).
+  // Tollerante: sezione/tabella mancante -> array vuoto + console.warn, mai un'eccezione.
+  function parsePoolInventore(testo) {
+    if (!testo) return [];
+    var righe = testo.split(/\r?\n/);
+
+    // isola le righe della sezione "## Pool Inventore" (fino al prossimo "## " di pari livello)
+    var dentro = false;
+    var righeSezione = [];
+    for (var r = 0; r < righe.length; r++) {
+      var riga = righe[r];
+      if (riga.indexOf('## ') === 0) {
+        var titolo = riga.substring(3).trim().toLowerCase();
+        dentro = (titolo.indexOf('pool inventore') !== -1);
+        continue;
+      }
+      if (dentro) righeSezione.push(riga);
+    }
+
+    var tabella = primaTabella(righeSezione.join('\n'));
+    if (!tabella) {
+      console.warn('PETQ.content: sezione "Pool Inventore" non trovata o senza tabella');
+      return [];
+    }
+
+    var out = [];
+    for (var i = 0; i < tabella.righe.length; i++) {
+      var c = tabella.righe[i];
+      if (c.length < 3) continue; // colonne attese: # | Oggetto | Effetto
+      var nome = (c[1] || '').trim();
+      if (nome === '' || /^oggetto$/i.test(nome)) continue; // salta header ripetuto/righe vuote
+      var effetto = (c[2] || '').trim();
+      out.push({ nome: nome, effetto: effetto });
+    }
+
+    if (out.length !== 7) {
+      console.warn('PETQ.content: Pool Inventore ha ' + out.length + ' voci invece di 7');
+    }
     return out;
   }
 

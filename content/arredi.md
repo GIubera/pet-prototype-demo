@@ -39,6 +39,13 @@ Bozza di struttura con esempi di Claude, lista definitiva da fare in sessione de
 | Pesi | salone | entrambe | comune | drop missione (M7 fallimento) | +1 Forza passiva |
 | Pattino spaiato | salone | entrambe | comune | drop missione (M8 fallimento) | +1 Velocità passiva |
 | Pattini da gara | salone | entrambe | rara | drop missione rara (M8 super successo) | +2 Velocità passiva + perk Sport |
+| Chip di memoria | salone | entrambe | comune | Pool Inventore (talento Inventore) | +1 Intelligenza passiva |
+| Ventola overcloccata | salone | entrambe | comune | Pool Inventore (talento Inventore) | +1 Velocità passiva |
+| Torcia laser | salone | entrambe | rara | Pool Inventore (talento Inventore) | +2 Felicità passiva |
+| Coppa della Fiera | salone | entrambe | rara | drop missione rara (M9 super successo) | +1 Intelligenza passiva + perk Studio (Doc Brown) |
+| Coppa Robot Wars | camera | entrambe | comune | drop missione (M10 standard) | +1 Intelligenza passiva |
+| Mecha-Bot | camera | entrambe | rara | drop missione rara (M10 super Intelligenza) | +2 Forza passiva |
+| Telecomando Pirata | salone | entrambe | rara | drop missione rara (M10 super Maleducato) | +1 Velocità passiva + perk Sabotatore |
 
 Tutti provvisoriamente in "salone" (nessuna stanza specifica discussa in sessione) — da rivedere quando si definiscono gli slot per stanza.
 

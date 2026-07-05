@@ -715,41 +715,184 @@ window.PETQ = window.PETQ || {};
     return prob;
   }
 
+  // ==================== GRUPPO D: Furto & Invenzione (PROTOTIPO 2, Blocco 9 — ultimo batch) ====================
+  // Stesso pattern dei gruppi precedenti: talentiAttivi(state) -> scan di effetti[] -> parse del
+  // valore grezzo, letto SEMPRE a runtime (mai bakeato). Gli hook lato ui.js (shop/salone) e
+  // care.js (reset giornaliero) sono documentati nei commenti li' dove vengono chiamati.
+
+  // ---------- furto=1/giorno (Cleptomane: max 15 monete / Boss di Quartiere: nessun tetto) ----------
+  // Il pet puo' prendere GRATIS 1 oggetto al giorno dal Negozio. I due talenti differiscono solo
+  // per il TETTO di valore dell'oggetto rubabile:
+  //   Cleptomane        -> "furto=1/giorno (max 15 monete)"  -> tetto 15 (solo cibi <= 15 monete)
+  //   Boss di Quartiere -> "furto=1/giorno (nessun tetto)"    -> tetto null (qualsiasi cibo)
+  // Ritorna { attivo: bool, tetto: number|null }: attivo=false se il pet non ha nessuno dei due;
+  // se ha ENTRAMBI (impossibile col design attuale — sono su personalita' diverse — ma teniamo la
+  // regola robusta) vince il piu' PERMISSIVO (tetto null batte qualsiasi numero; tra due numeri il
+  // piu' alto). Il valore numerico del tetto si legge dal token stesso (non hardcodato: se il
+  // fondatore ritocca "max 15 monete" in talenti.md basta cambiare il testo).
+  function furtoDisponibile(state) {
+    var attivi = talentiAttivi(state);
+    var attivo = false;
+    var tetto = -Infinity; // -Infinity = nessun furto ancora trovato; null = nessun tetto (vince)
+    var senzaTetto = false;
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        if (t.toLowerCase().indexOf('furto=') !== 0) continue;
+        attivo = true;
+        var valore = t.substring(t.indexOf('=') + 1).toLowerCase();
+        // "nessun tetto" (Boss) -> tetto null; "max 15 monete" (Cleptomane) -> tetto = 15.
+        if (valore.indexOf('nessun tetto') !== -1) {
+          senzaTetto = true;
+        } else {
+          var m = valore.match(/max\s*(\d+)/);
+          if (m) {
+            var n = parseInt(m[1], 10);
+            if (n > tetto) tetto = n;
+          } else {
+            // token furto senza "max N" ne' "nessun tetto": lo trattiamo come senza tetto per
+            // non bloccare per errore un futuro talento scritto diversamente.
+            senzaTetto = true;
+          }
+        }
+      }
+    }
+    if (!attivo) return { attivo: false, tetto: -1 };
+    if (senzaTetto) return { attivo: true, tetto: null };
+    return { attivo: true, tetto: (tetto === -Infinity) ? null : tetto };
+  }
+
+  // ---------- invenzione=1/settimana (Inventore: Pool Inventore) ----------
+  // 1 volta ogni 7 GIORNI DI GIOCO (pet.giorniVita, lo stesso contatore dell'evoluzione: avanza a
+  // ogni "nuovo giorno" via care.dailyLogin) il pet puo' inventare 1 oggetto casuale dal Pool
+  // Inventore, saltando l'allenamento. Modello scelto (documentato come richiesto dal brief):
+  // FINESTRA SCORREVOLE su giorniVita — si confronta pet.giorniVita con state.ultimaInvenzioneGiorno
+  // (il giorniVita dell'ultima invenzione). Disponibile se non ha mai inventato (campo assente) o
+  // se sono passati >= 7 giorni di gioco dall'ultima. Perche' giorniVita e non una data reale: cosi'
+  // il debug "Nuovo giorno" (che avanza giorniVita) permette di testare il ciclo settimanale senza
+  // aspettare 7 giorni veri, coerente con tutto il resto del pacing di gioco.
+  var GIORNI_INVENZIONE = 7;
+
+  function haInventore(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        if ((effetti[j] || '').trim().toLowerCase().indexOf('invenzione=') === 0) return true;
+      }
+    }
+    return false;
+  }
+
+  function invenzioneDisponibile(state) {
+    if (!haInventore(state)) return false;
+    var giorni = (state && state.pet && typeof state.pet.giorniVita === 'number') ? state.pet.giorniVita : 0;
+    if (typeof state.ultimaInvenzioneGiorno !== 'number') return true; // mai inventato
+    return (giorni - state.ultimaInvenzioneGiorno) >= GIORNI_INVENZIONE;
+  }
+
+  // Estrae 1 oggetto casuale dal Pool Inventore (PETQ.content.data.poolInventore) e INTERPRETA il
+  // suo effetto testuale applicandolo allo state. Ritorna { ok, oggetto:{nome,effetto}, msg,
+  // dettaglio } (dettaglio = descrizione breve di cosa e' successo, per il pannellino UI), oppure
+  // { ok:false } se il pool non e' caricato. NON tocca il timer: il chiamante (ui.js) marca
+  // state.ultimaInvenzioneGiorno DOPO un successo (mantiene qui la sola meccanica di applicazione,
+  // stesso principio "il modulo talenti dice COSA, la UI decide QUANDO consumare il turno").
+  //
+  // Interpretazione effetti (v. tabella "Pool Inventore" in talenti.md):
+  //   "+30 Energia subito"                         -> +30 alla stat energia (clamp 0..100)
+  //   "arredo, +1 Int passivo"                     -> PETQ.arredi.aggiungi("Chip di memoria")
+  //   "arredo, +1 Velocità passivo"                -> PETQ.arredi.aggiungi("Ventola overcloccata")
+  //   "+20 monete"                                 -> +20 state.coins
+  //   "cibo, +1 Int (verdura)"                     -> +1 porzione "Snack riciclato" in dispensa
+  //   "arredo raro decorativo, +2 Felicità passiva"-> PETQ.arredi.aggiungi("Torcia laser")
+  //   "nessun bonus, ma vendibile a 15 monete"     -> +1 "Prototipo fallato" in dispensa/collezione (nessun effetto immediato)
+  // La mappa nome-oggetto -> azione e' per NOME (chiave stabile del pool), non per parsing
+  // dell'effetto: cosi' un ritocco al testo dell'effetto non rompe l'applicazione. Il testo
+  // dell'effetto resta comunque mostrato all'utente (dettaglio) preso pari pari dal pool.
+  function clampLoc(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  function applicaInvenzione(state) {
+    var data = window.PETQ.content && window.PETQ.content.data;
+    var pool = (data && data.poolInventore) || [];
+    if (!pool.length) return { ok: false, msg: 'Pool Inventore non disponibile.' };
+
+    var oggetto = PETQ.rng.pick(pool);
+    var nome = (oggetto.nome || '').toLowerCase();
+    var dettaglio = oggetto.effetto || '';
+
+    if (nome.indexOf('batteria') !== -1) {
+      if (state.pet && state.pet.stats && typeof state.pet.stats.energia === 'number') {
+        state.pet.stats.energia = clampLoc(state.pet.stats.energia + 30, 0, 100);
+      }
+    } else if (nome.indexOf('gruzzolo') !== -1) {
+      state.coins = (state.coins || 0) + 20;
+    } else if (nome.indexOf('chip') !== -1) {
+      if (PETQ.arredi && PETQ.arredi.aggiungi) PETQ.arredi.aggiungi(state, 'Chip di memoria');
+      dettaglio += ' — aggiunto alla collezione (piazzalo per il bonus)';
+    } else if (nome.indexOf('ventola') !== -1) {
+      if (PETQ.arredi && PETQ.arredi.aggiungi) PETQ.arredi.aggiungi(state, 'Ventola overcloccata');
+      dettaglio += ' — aggiunto alla collezione (piazzalo per il bonus)';
+    } else if (nome.indexOf('torcia') !== -1) {
+      if (PETQ.arredi && PETQ.arredi.aggiungi) PETQ.arredi.aggiungi(state, 'Torcia laser');
+      dettaglio += ' — aggiunto alla collezione (piazzalo per il bonus)';
+    } else if (nome.indexOf('snack') !== -1) {
+      aggiungiCiboDispensa(state, 'Snack riciclato');
+      dettaglio += ' — finito nel frigo';
+    } else if (nome.indexOf('prototipo') !== -1) {
+      // "nessun bonus, ma vendibile a 15 monete": lo mettiamo tra i posseduti come arredo (non e'
+      // in arredi.md, quindi vendi() usera' il fallback ~5 monete: il "vendibile a 15" resta sapore
+      // testuale, non abbiamo un canale prezzo dedicato per gli item non-arredo). Se PETQ.arredi
+      // non e' pronto, non facciamo nulla (nessun bonus comunque).
+      if (PETQ.arredi && PETQ.arredi.aggiungi) PETQ.arredi.aggiungi(state, oggetto.nome);
+      dettaglio += ' — nella collezione, rivendibile';
+    }
+
+    return { ok: true, oggetto: oggetto, dettaglio: dettaglio, msg: 'Inventato: ' + oggetto.nome + '!' };
+  }
+
+  // Aggiunge 1 porzione di un cibo alla dispensa (frigo), creando la voce se assente. Usato sia dal
+  // furto (ruba un cibo dal negozio) sia dall'invenzione ("Snack riciclato"). Duplicato minimale
+  // della logica di ui.js eseguiAcquisto per non dipendere dalla UI da un modulo di dominio.
+  function aggiungiCiboDispensa(state, nomeCibo) {
+    if (!state) return;
+    if (!Array.isArray(state.dispensa)) state.dispensa = [];
+    for (var i = 0; i < state.dispensa.length; i++) {
+      if (state.dispensa[i].nome === nomeCibo) {
+        state.dispensa[i].qty = (state.dispensa[i].qty || 0) + 1;
+        return;
+      }
+    }
+    state.dispensa.push({ nome: nomeCibo, qty: 1 });
+  }
+
   // ==================== REGISTRY token NON ancora agganciati (TODO batch futuri) ====================
   // Elenco di TUTTI i token del DSL "Dati" (v. content/talenti.md legenda in cima) che il
   // parser gia' legge dentro talento.effetti ma che NESSUN sistema di gioco applica ancora.
   // Non e' codice eseguito: e' documentazione viva + un piccolo helper (tokenNonAgganciati) per
   // scoprire a runtime quali effetti un pet ha "silenti", utile in debug/scheda.
   //
-  // AGGIORNATO in questo batch (Gruppo B — Missioni/Economia): rimossi dalla lista bonus_missione,
-  // ogni_missione, mancia, login, blocca_categoria, fallimento, bonus_missione_monete e il token
-  // libero "se fallimento_carattere: ..." (Bad Loser) — ora agganciati (v. sezione "GRUPPO B"
-  // sopra). perk_tag resta in lista ma con un HELPER STUB gia' pronto (perkTagAttivo, sempre
-  // false): aspetta i tag missione del batch missioni P2, v. nota dedicata sotto. Restano da fare:
+  // AGGIORNATO in questo batch (Gruppo D — Furto/Invenzione, ULTIMO): rimossi dalla lista furto e
+  // invenzione — ora agganciati (v. sezione "GRUPPO D" sopra: furtoDisponibile letto da ui.js
+  // pannelloShop; invenzioneDisponibile/applicaInvenzione letti da ui.js renderAzioniSalone).
+  // Restano SOLO due token, entrambi per design e non per "TODO":
   //
-  //   furto=...                -> oggetto gratis giornaliero dal negozio (con o senza tetto)
-  //   invenzione=...          -> Pool Inventore settimanale (salta allenamento, item casuale)
   //   perk_tag=...            -> [STUB pronto, v. perkTagAttivo] niente-fallimento + super
   //                              garantito su un TAG di missione (non su una categoria: richiede
   //                              i tag missione, non ancora esistenti — v. PROTOTIPO-2.md Blocco
   //                              3/Blocco 9. Talenti coinvolti: Amante della Natura, Inventore.
   //                              NON aggiungere il campo tag al DSL missioni qui: lo fa il batch
   //                              missioni; questo modulo si limita allo stub finche' non esiste)
-  //   nota=...                -> annotazioni testuali non meccaniche (es. "malus_salute_sporco_resta")
+  //   nota=...                -> annotazioni testuali non meccaniche (es. "malus_salute_sporco_resta"):
+  //                              NON e' un token da agganciare, e' documentazione di design.
   //
-  // AGGIORNATO in questo batch (Gruppo C — Salute/Sonno/Igiene/Parole): rimossi dalla lista
-  // igiene_felicita, immune_malus_condizioni, notte, infermeria_costo, infermeria_cura,
-  // risveglio, parole_giorno, uso_parola — ora agganciati (v. sezione "GRUPPO C" sopra). Restano
-  // SOLO furto/invenzione (da fare), perk_tag (stub pronto) e nota (solo descrittivo, mai
-  // meccanico per design: v. talenti.md "malus_salute_sporco_resta", che documenta che il malus
-  // Salute da sporco di Idrofobico resta invariato apposta, non e' un token da agganciare).
-  //
-  // Quando si implementa uno di questi in un batch futuro: aggiungere l'hook nel sistema
-  // pertinente (missions.js/care.js/pet.js/dialog.js) SUL MODELLO di bonusStat/capCoccole sopra
-  // (leggere talentiAttivi(state) -> trovaToken(...)) e rimuovere la voce da questa lista.
+  // Storico: Gruppo A (cibo/allenamento/energia), Gruppo B (missioni/economia), Gruppo C (salute/
+  // sonno/igiene/parole) e Gruppo D (furto/invenzione) hanno agganciato tutti i token meccanici.
+  // Quando arriveranno i tag missione (batch missioni P2), sostituire il corpo di perkTagAttivo
+  // (oggi stub) con la logica super-garantito + niente-fallimento e rimuovere perk_tag da qui.
 
   var TOKEN_NON_AGGANCIATI = [
-    'furto', 'invenzione', 'perk_tag (stub pronto, attende tag missione P2)',
+    'perk_tag (stub pronto, attende tag missione P2)',
     'nota (solo descrittivo, mai meccanico per design)'
   ];
 
@@ -764,7 +907,8 @@ window.PETQ = window.PETQ || {};
     'allenamenti_giorno=', 'allenamento_extra=', 'allenamento_durata=', 'allenamento_energia=',
     'energia_decay=', 'bonus_missione=', 'ogni_missione=', 'mancia=', 'login=',
     'blocca_categoria=', 'fallimento=', 'bonus_missione_monete=', 'missione_durata=',
-    'igiene_felicita=', 'infermeria_costo=', 'infermeria_cura=', 'parole_giorno=', 'uso_parola='
+    'igiene_felicita=', 'infermeria_costo=', 'infermeria_cura=', 'parole_giorno=', 'uso_parola=',
+    'furto=', 'invenzione='
   ];
   var TOKEN_ESATTI_AGGANCIATI = ['ignora_rifiuto_energia', 'immune_malus_condizioni'];
 
@@ -841,6 +985,12 @@ window.PETQ = window.PETQ || {};
     igieneFelicitaInvertita: igieneFelicitaInvertita,
     parolePerGiorno: parolePerGiorno,
     usoParolaProb: usoParolaProb,
+    // Gruppo D (Furto & Invenzione)
+    furtoDisponibile: furtoDisponibile,
+    haInventore: haInventore,
+    invenzioneDisponibile: invenzioneDisponibile,
+    applicaInvenzione: applicaInvenzione,
+    _giorniInvenzione: GIORNI_INVENZIONE,
     _capCoccoleDefault: CAP_COCCOLE_DEFAULT,
     _allenamentiGiornoDefault: ALLENAMENTI_GIORNO_DEFAULT,
     _paroleGiornoDefault: PAROLE_GIORNO_DEFAULT,

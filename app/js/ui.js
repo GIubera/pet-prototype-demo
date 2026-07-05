@@ -2218,6 +2218,27 @@ window.PETQ = window.PETQ || {};
       container.appendChild(studioWrap);
     }
 
+    // "Inventa qualcosa" (PROTOTIPO 2, Blocco 9, Gruppo D, talento Nerd raro "Inventore",
+    // invenzione=1/settimana): bottone visibile SOLO col talento Inventore. Attivo se il timer
+    // settimanale e' scaduto (PETQ.talenti.invenzioneDisponibile su pet.giorniVita); altrimenti
+    // disabilitato con l'hint "manca N giorno/i". Consuma il "turno inventivo" della settimana
+    // (state.ultimaInvenzioneGiorno), NON l'allenamento normale (non tocca state.allenamento/
+    // trainCount). Occupato in missione -> disabilitato (come Studio veloce).
+    if (petHaInventore(currentState)) {
+      var invWrap = el('div', 'petq-riga-azione');
+      var invDisponibile = PETQ.talenti && PETQ.talenti.invenzioneDisponibile && PETQ.talenti.invenzioneDisponibile(currentState);
+      var invBtn = el('button', 'petq-btn petq-btn-piccolo', 'Inventa qualcosa');
+      if (!invDisponibile || inMissione) {
+        invBtn.disabled = true;
+        invBtn.title = inMissione ? nome + ' è in missione' : 'Invenzione settimanale: ' + testoAttesaInvenzione(currentState);
+      }
+      invBtn.addEventListener('click', function () {
+        eseguiInvenzione();
+      });
+      invWrap.appendChild(invBtn);
+      container.appendChild(invWrap);
+    }
+
     // collezione arredi
     var collBtn = el('button', 'petq-btn', collezioneAperta ? 'Chiudi collezione' : 'Collezione');
     collBtn.addEventListener('click', function () {
@@ -2226,6 +2247,70 @@ window.PETQ = window.PETQ || {};
     });
     container.appendChild(collBtn);
     if (collezioneAperta) container.appendChild(costruisciCollezione());
+  }
+
+  // ---------- invenzione (talento Nerd raro "Inventore", Gruppo D) ----------
+
+  function petHaInventore(state) {
+    return !!(PETQ.talenti && PETQ.talenti.haInventore && PETQ.talenti.haInventore(state));
+  }
+
+  // Testo hint per il bottone disabilitato: quanti giorni di gioco mancano al prossimo turno
+  // inventivo (finestra di 7 giorni su pet.giorniVita, v. talenti.invenzioneDisponibile).
+  function testoAttesaInvenzione(state) {
+    var GIORNI = (PETQ.talenti && PETQ.talenti._giorniInvenzione) ? PETQ.talenti._giorniInvenzione : 7;
+    var giorni = (state && state.pet && typeof state.pet.giorniVita === 'number') ? state.pet.giorniVita : 0;
+    if (typeof state.ultimaInvenzioneGiorno !== 'number') return 'disponibile ora';
+    var mancano = GIORNI - (giorni - state.ultimaInvenzioneGiorno);
+    if (mancano <= 0) return 'disponibile ora';
+    return 'tra ' + mancano + (mancano === 1 ? ' giorno' : ' giorni');
+  }
+
+  // Inventa 1 oggetto casuale dal Pool Inventore: applica l'effetto (talenti.applicaInvenzione),
+  // marca il timer settimanale (state.ultimaInvenzioneGiorno = giorniVita corrente) e mostra
+  // cosa ha inventato in un pannellino (overlay a foglio, stesso pattern del diario), NON tocca
+  // l'allenamento normale. Doppia guardia sulla disponibilita' (doppio tap veloce).
+  function eseguiInvenzione() {
+    if (!currentState) return;
+    if (!(PETQ.talenti && PETQ.talenti.invenzioneDisponibile && PETQ.talenti.invenzioneDisponibile(currentState))) {
+      mostraToast('Invenzione non disponibile ora.');
+      renderAzioni();
+      return;
+    }
+    if (currentState.missione) {
+      mostraToast((currentState.pet.nome || 'Il pet') + ' è in missione.');
+      return;
+    }
+    var r = PETQ.talenti.applicaInvenzione(currentState);
+    if (!r || !r.ok) {
+      mostraToast((r && r.msg) || 'Invenzione fallita.');
+      return;
+    }
+    // consuma il turno inventivo della settimana (finestra su giorniVita)
+    currentState.ultimaInvenzioneGiorno = (currentState.pet && typeof currentState.pet.giorniVita === 'number') ? currentState.pet.giorniVita : 0;
+    PETQ.save.save(currentState);
+    aggiornaHud(currentState);
+    disegnaStanzaEPet(currentState);
+    renderAzioni();
+    mostraPannelloInvenzione(r.oggetto, r.dettaglio);
+  }
+
+  // Pannellino "hai inventato": overlay a foglio (stesso stile del diario/scheda, "Chiudi" non
+  // resetta la stanza). Mostra nome oggetto + descrizione dell'effetto applicato.
+  function mostraPannelloInvenzione(oggetto, dettaglio) {
+    var overlay = el('div', 'petq-scheda-overlay');
+    var pagina = el('div', 'petq-scheda-pagina');
+    pagina.appendChild(el('h2', 'petq-scheda-titolo', 'Invenzione!'));
+    pagina.appendChild(el('p', 'petq-scheda-sottotitolo', (currentState.pet.nome || 'Il pet') + ' ha inventato qualcosa saltando l\'allenamento.'));
+    pagina.appendChild(el('div', 'petq-arredo-nome', oggetto.nome));
+    pagina.appendChild(el('div', 'petq-arredo-dett', dettaglio || oggetto.effetto || ''));
+    var chiudi = el('button', 'petq-btn', 'Chiudi');
+    chiudi.addEventListener('click', function () {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    });
+    pagina.appendChild(chiudi);
+    overlay.appendChild(pagina);
+    document.getElementById('app').appendChild(overlay);
   }
 
   // ---------- collezione arredi ----------
@@ -2560,8 +2645,27 @@ window.PETQ = window.PETQ || {};
       return wrap;
     }
 
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo D, "furto=1/giorno", Cleptomane/Boss di Quartiere):
+    // il pet puo' prendere GRATIS 1 oggetto al giorno dal Negozio. Il bottone "Ruba (gratis)"
+    // compare su ogni cibo IDONEO (prezzo <= tetto, o qualsiasi se tetto null) SOLO se il talento
+    // e' attivo E non e' gia' stato usato oggi (state.furtoDay !== oggi). Dopo un furto, le opzioni
+    // "Ruba" spariscono per il resto della giornata (v. eseguiFurto + il ricalcolo qui sopra).
+    var furto = (PETQ.talenti && PETQ.talenti.furtoDisponibile) ? PETQ.talenti.furtoDisponibile(currentState) : { attivo: false };
+    var furtoUsatoOggi = currentState.furtoDay === oggiStr();
+    var furtoAttivoOra = furto.attivo && !furtoUsatoOggi;
+    if (furto.attivo) {
+      var tettoTxt = (furto.tetto === null) ? 'qualsiasi oggetto' : 'oggetti fino a ' + furto.tetto + ' monete';
+      var hintFurto = furtoUsatoOggi
+        ? 'Furto del giorno già usato: torna domani.'
+        : 'Talento ladro: puoi rubare gratis 1 oggetto al giorno (' + tettoTxt + ').';
+      wrap.appendChild(el('div', 'petq-missione-meta', hintFurto));
+    }
+
     var lista = el('div', 'petq-shop-lista');
     for (var i = 0; i < cibi.length; i++) {
+      // cibi con costo 0 non sono in vendita (es. "Snack riciclato", esce solo dal Pool
+      // Inventore): non vanno mostrati al Negozio (ne' comprabili ne' rubabili).
+      if ((cibi[i].costo || 0) <= 0) continue;
       (function (cibo) {
         var riga = el('div', 'petq-shop-riga');
 
@@ -2584,11 +2688,53 @@ window.PETQ = window.PETQ || {};
         btn.addEventListener('click', function () { eseguiAcquisto(cibo, riga); });
         riga.appendChild(btn);
 
+        // "Ruba (gratis)": solo se il furto e' attivo oggi e questo cibo rientra nel tetto.
+        var idoneoFurto = furtoAttivoOra && (furto.tetto === null || (cibo.costo || 0) <= furto.tetto);
+        if (idoneoFurto) {
+          var btnRuba = el('button', 'petq-btn petq-btn-mini petq-btn-ruba', 'Ruba (gratis)');
+          btnRuba.addEventListener('click', function () { eseguiFurto(cibo, riga); });
+          riga.appendChild(btnRuba);
+        }
+
         lista.appendChild(riga);
       })(cibi[i]);
     }
     wrap.appendChild(lista);
     return wrap;
+  }
+
+  // Furto (talento Cleptomane/Boss di Quartiere): aggiunge 1 porzione del cibo alla dispensa
+  // SENZA scalare monete, segna state.furtoDay = oggi (consumato per la giornata: sparisce ogni
+  // "Ruba" fino al giorno dopo), toast/battuta. Rivalida qui il furto per sicurezza (doppio tap
+  // veloce, cibo fuori tetto): la UI ha gia' filtrato, ma non ci fidiamo del solo render.
+  function eseguiFurto(cibo, rigaEl) {
+    if (!currentState) return;
+    var furto = (PETQ.talenti && PETQ.talenti.furtoDisponibile) ? PETQ.talenti.furtoDisponibile(currentState) : { attivo: false };
+    var oggi = oggiStr();
+    if (!furto.attivo || currentState.furtoDay === oggi) {
+      shakeCard(rigaEl);
+      mostraToast('Niente furto disponibile ora.');
+      aggiornaDettaglioMappa(statoMappa());
+      return;
+    }
+    if (furto.tetto !== null && (cibo.costo || 0) > furto.tetto) {
+      shakeCard(rigaEl);
+      mostraToast('Troppo caro per rubarlo (max ' + furto.tetto + ' monete).');
+      return;
+    }
+    if (!Array.isArray(currentState.dispensa)) currentState.dispensa = [];
+    var voce = null;
+    for (var i = 0; i < currentState.dispensa.length; i++) {
+      if (currentState.dispensa[i].nome === cibo.nome) { voce = currentState.dispensa[i]; break; }
+    }
+    if (voce) voce.qty = (voce.qty || 0) + 1;
+    else currentState.dispensa.push({ nome: cibo.nome, qty: 1 });
+
+    currentState.furtoDay = oggi;
+    PETQ.save.save(currentState);
+    aggiornaHud(currentState);
+    aggiornaDettaglioMappa(statoMappa());
+    mostraToast('Rubato ' + cibo.nome + ': gratis, ora è nel frigo. Niente altri furti oggi.');
   }
 
   // Compra 1 porzione del cibo: scala le monete, incrementa la qty in dispensa (o crea la
@@ -2949,6 +3095,10 @@ window.PETQ = window.PETQ || {};
     pagina.appendChild(el('h2', 'petq-diario-titolo', 'Diario di ' + (state.pet.nome || 'il pet') + ' — sera'));
 
     var righe = (PETQ.diario && PETQ.diario.componiPagina) ? PETQ.diario.componiPagina(state) : [];
+    // Il diario e' bloccato a 1/giorno (v. diario.js componiPagina): componiPagina memorizza
+    // la pagina in state.diarioOggi la prima volta del giorno; salviamo cosi' il lock resiste
+    // anche a un reload (riaprendo la scrivania esce la stessa pagina, non una nuova estrazione).
+    if (PETQ.save && PETQ.save.save) PETQ.save.save(state);
     if (righe.length === 0) {
       pagina.appendChild(el('p', 'petq-diario-vuoto', '(pagina bianca: niente da raccontare oggi)'));
     } else {
@@ -3317,6 +3467,7 @@ window.PETQ = window.PETQ || {};
       currentState.cureDay = null;
       currentState.cureOggi = 0;
       currentState.categoriePastiOggi = [];
+      currentState.furtoDay = null;
       currentState.lastLoginDay = null;
       retrodataCooldownMissioni(currentState, 1);
       if (PETQ.care && PETQ.care.dailyLogin) PETQ.care.dailyLogin(currentState);

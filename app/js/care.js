@@ -420,6 +420,13 @@ window.PETQ = window.PETQ || {};
     state.categoriePastiOggi = [];
     state.cureOggi = 0;
 
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo D, "furto=1/giorno", Cleptomane/Boss di Quartiere):
+    // il furto giornaliero e' gia' gestito per confronto (state.furtoDay !== oggi in ui.js), ma
+    // azzeriamo qui per pulizia (coerente con gli altri contatori giornalieri). L'invenzione
+    // settimanale usa invece pet.giorniVita (avanzato sopra), niente reset qui: la finestra di
+    // 7 giorni scorre da sola via invenzioneDisponibile.
+    state.furtoDay = null;
+
     // Diario (PROTOTIPO-2.md punto 6): l'esito missione di ieri non conta piu' per la pagina
     // diario di oggi (v. missions.risolvi, che lo riscrive quando si risolve una missione oggi).
     state.esitoMissioneGiorno = null;
