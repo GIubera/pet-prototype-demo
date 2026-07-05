@@ -347,63 +347,274 @@ window.PETQ = window.PETQ || {};
     return false;
   }
 
+  // ==================== GRUPPO B: Missioni & Economia (PROTOTIPO 2, Blocco 9) ====================
+  // Stesso pattern del Gruppo A: talentiAttivi(state) -> trovaToken/scan di effetti[] -> parse
+  // del valore grezzo, letto SEMPRE a runtime (mai bakeato). Gli hook lato missions.js/care.js
+  // sono documentati nei commenti li' dove vengono chiamati.
+
+  // Alias per i nomi di stat/risorsa usati nei token missione (in piu' rispetto a
+  // STAT_ALIAS_TALENTI c'e' "monete", che non e' una stat RPG ma una risorsa: usata da
+  // ogni_missione=monete+5 di Cuore Magnetico).
+  var CHIAVE_ALIAS_MISSIONI = { int: 'intelligenza', forza: 'forza', velocita: 'velocita', carisma: 'carisma', monete: 'monete' };
+
+  function chiaveMissioneValida(chiave) {
+    return CHIAVE_ALIAS_MISSIONI[chiave] || (STAT_NOMI.indexOf(chiave) !== -1 ? chiave : null);
+  }
+
+  // ---------- ogni_missione=<stat|monete>+N (Spirito Agonistico, Mani Lestre, Cuore Magnetico) ----------
+  // Ritorna { forza, intelligenza, velocita, carisma, monete } da sommare ad OGNI missione
+  // completata (qualsiasi esito non-null: super/standard/fallimento), a prescindere dalla
+  // categoria. Il chiamante (missions.risolvi) applica dopo aver scelto l'esito, sempre.
+  function bonusOgniMissione(state) {
+    var somma = { forza: 0, intelligenza: 0, velocita: 0, carisma: 0, monete: 0 };
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        if (t.indexOf('ogni_missione=') !== 0) continue;
+        var valore = t.substring('ogni_missione='.length).trim();
+        var m = valore.match(/^([a-z]+)\s*([+-]\d+)$/i);
+        if (!m) continue;
+        var chiave = chiaveMissioneValida(m[1].toLowerCase());
+        if (!chiave) continue;
+        somma[chiave] += parseInt(m[2], 10);
+      }
+    }
+    return somma;
+  }
+
+  // ---------- bonus_missione=<categoria>:<stat>+N[,durata-1h] (Topo di Biblioteca, Pacifista) ----------
+  // Formato osservato in talenti.md:
+  //   "sociale:carisma+1"          -> categoria "sociale", +1 Carisma extra all'esito
+  //   "studio:int+1,durata-1h"     -> categoria "studio", +1 Int extra all'esito E -1h di durata
+  //                                    all'avvio della missione
+  // Ritorna { statExtra: {forza,intelligenza,velocita,carisma}, durataDeltaH } per la CATEGORIA
+  // passata (0/{} se nessun talento tocca quella categoria). durataDeltaH e' un numero di ORE
+  // (negativo = accorcia), da sommare a quello globale di missioneDurataDeltaH.
+  function bonusMissioneCategoria(state, categoria) {
+    var statExtra = { forza: 0, intelligenza: 0, velocita: 0, carisma: 0 };
+    var durataDeltaH = 0;
+    if (!categoria) return { statExtra: statExtra, durataDeltaH: durataDeltaH };
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        if (t.indexOf('bonus_missione=') !== 0) continue;
+        var valore = t.substring('bonus_missione='.length).trim();
+        var due = valore.indexOf(':');
+        if (due === -1) continue;
+        var catToken = valore.substring(0, due).trim().toLowerCase();
+        if (catToken !== categoria) continue;
+        var resto = valore.substring(due + 1).trim(); // "int+1,durata-1h" oppure "carisma+1"
+
+        var parti = resto.split(',');
+        for (var k = 0; k < parti.length; k++) {
+          var p = parti[k].trim();
+          var mStat = p.match(/^([a-z]+)\s*([+-]\d+)$/i);
+          if (mStat) {
+            var statAlias = STAT_ALIAS_TALENTI[mStat[1].toLowerCase()] || (STAT_NOMI.indexOf(mStat[1].toLowerCase()) !== -1 ? mStat[1].toLowerCase() : null);
+            if (statAlias) statExtra[statAlias] += parseInt(mStat[2], 10);
+            continue;
+          }
+          var mDurata = p.match(/^durata\s*([+-]?\d+(?:[.,]\d+)?)\s*h$/i);
+          if (mDurata) {
+            durataDeltaH += parseFloat(mDurata[1].replace(',', '.'));
+          }
+        }
+      }
+    }
+    return { statExtra: statExtra, durataDeltaH: durataDeltaH };
+  }
+
+  // ---------- bonus_missione_monete=x1.5 (Cleptomane, Boss di Quartiere) ----------
+  // Ritorna il moltiplicatore da applicare alle monete di reward di UNA missione (1 se nessun
+  // talento attivo). Talenti.md non distingue "solo missioni a monete" da "tutte le missioni"
+  // nel token (e' lo stesso token per entrambi, il testo cambia solo la descrizione): applicarlo
+  // al token monete di reward quando c'e' basta, perche' se la missione non da' monete non c'e'
+  // nessun token su cui moltiplicare.
+  function bonusMissioneMoneteMult(state) {
+    var attivi = talentiAttivi(state);
+    var mult = 1;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'bonus_missione_monete');
+      if (!valore) continue;
+      var m = valore.match(/x\s*([\d.,]+)/i);
+      if (m) mult *= parseFloat(m[1].replace(',', '.'));
+    }
+    return mult;
+  }
+
+  // ---------- mancia=x3 (Cuore Magnetico) ----------
+  // Ritorna il moltiplicatore da applicare alla mancia post-missione (v. missions.calcolaMancia,
+  // GDD "Economia": "mance post-missione che scalano col carisma", bilanciamento.md "Mancia
+  // post-missione: 1 moneta ogni 5 punti di Carisma"). 1 se nessun talento la tocca.
+  function manciaMult(state) {
+    var attivi = talentiAttivi(state);
+    var mult = 1;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'mancia');
+      if (!valore) continue;
+      var m = valore.match(/x\s*([\d.,]+)/i);
+      if (m) mult *= parseFloat(m[1].replace(',', '.'));
+    }
+    return mult;
+  }
+
+  // ---------- login=monete+10 (Cuore Magnetico) ----------
+  // Ritorna il bonus monete EXTRA da sommare al login giornaliero (0 se nessun talento attivo).
+  function loginBonusMonete(state) {
+    var attivi = talentiAttivi(state);
+    var extra = 0;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'login');
+      if (!valore) continue;
+      var m = valore.match(/^monete\s*([+-]\d+)$/i);
+      if (m) extra += parseInt(m[1], 10);
+    }
+    return extra;
+  }
+
+  // ---------- missione_durata=-1h (Fulmine di Quartiere) ----------
+  // Ritorna il delta ORE globale (negativo = accorcia) da applicare a TUTTE le missioni, prima
+  // del clamp al minimo di 1h fatto dal chiamante (missions.avvia). Combinabile col delta di
+  // categoria di bonusMissioneCategoria (es. Fulmine + un ipotetico bonus_missione di categoria
+  // si sommerebbero entrambi, anche se nessun talento attuale li unisce sullo stesso pet).
+  function missioneDurataDeltaH(state) {
+    var attivi = talentiAttivi(state);
+    var delta = 0;
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'missione_durata');
+      if (!valore) continue;
+      var m = valore.match(/^([+-]?\d+(?:[.,]\d+)?)\s*h$/i);
+      if (m) delta += parseFloat(m[1].replace(',', '.'));
+    }
+    return delta;
+  }
+
+  // ---------- fallimento=fel-0 (Faccia di Bronzo) ----------
+  // Booleano: true se un talento attivo annulla la perdita di Felicita' dei fallimenti missione.
+  // NB combo voluta col -10 Felicita' extra di Bad Loser: quando entrambi sono attivi, questo
+  // annulla ANCHE quell'extra (v. missions.risolvi, applicato per ultimo su tutto il delta fel
+  // accumulato dal fallimento).
+  function fallimentoFelBloccato(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'fallimento');
+      if (valore && /^fel\s*-?0$/i.test(valore.trim())) return true;
+    }
+    return false;
+  }
+
+  // ---------- se fallimento_carattere: reward=x2, fel-10 (Bad Loser) ----------
+  // Il token e' un'unica stringa libera (nessun "chiave=valore" pulito, v. talenti.md): la
+  // riconosciamo per il prefisso fisso "se fallimento_carattere:" e ne ricaviamo i due numeri
+  // (moltiplicatore reward, malus Felicita' estra) invece di hardcodarli, cosi' se il fondatore
+  // ritocca i valori in talenti.md basta cambiare il testo, non il codice.
+  // Ritorna { moltReward, felExtra } o null se il pet non ha questo talento.
+  function badLoserEffetto(state) {
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var effetti = attivi[i].effetti || [];
+      for (var j = 0; j < effetti.length; j++) {
+        var t = (effetti[j] || '').trim();
+        if (t.toLowerCase().indexOf('se fallimento_carattere:') !== 0) continue;
+        var resto = t.substring(t.indexOf(':') + 1).trim(); // "reward=x2, fel-10"
+        var moltReward = 1;
+        var felExtra = 0;
+        var mMol = resto.match(/reward\s*=\s*x\s*([\d.,]+)/i);
+        if (mMol) moltReward = parseFloat(mMol[1].replace(',', '.'));
+        var mFel = resto.match(/fel\s*([+-]\d+)/i);
+        if (mFel) felExtra = parseInt(mFel[1], 10);
+        return { moltReward: moltReward, felExtra: felExtra };
+      }
+    }
+    return null;
+  }
+
+  // ---------- blocca_categoria=combattimento (Pacifista) ----------
+  // Ritorna true se un talento attivo esclude questa categoria dalla rosa del giorno.
+  function categoriaBloccata(state, categoria) {
+    if (!categoria) return false;
+    var attivi = talentiAttivi(state);
+    for (var i = 0; i < attivi.length; i++) {
+      var valore = trovaToken(attivi[i].effetti, 'blocca_categoria');
+      if (valore && valore.trim().toLowerCase() === categoria) return true;
+    }
+    return false;
+  }
+
+  // ---------- perk_tag=<tag> (Amante della Natura, Inventore) — STUB, attende tag missione P2 ----------
+  // Il DSL missioni non ha ancora un campo "tag" (v. content/talenti.md "Dipendenze / da fare
+  // in P2" e PROTOTIPO-2.md Blocco 3/Blocco 9): finche' non esiste, questo helper resta uno
+  // stub che legge comunque il token (per non far sparire l'informazione dal debug/scheda) ma
+  // NON applica nessun effetto di gioco. Quando il batch missioni aggiungera' il campo tag alle
+  // schede, sostituire il corpo con la stessa logica di categoriaBloccata/scegliEsito (super
+  // garantito + niente fallimento sulle missioni con quel tag, v. missions.scegliEsito).
+  function perkTagAttivo(state, tag) {
+    return false; // stub: nessun tag missione esiste ancora, sempre false per costruzione
+  }
+
   // ==================== REGISTRY token NON ancora agganciati (TODO batch futuri) ====================
   // Elenco di TUTTI i token del DSL "Dati" (v. content/talenti.md legenda in cima) che il
   // parser gia' legge dentro talento.effetti ma che NESSUN sistema di gioco applica ancora.
   // Non e' codice eseguito: e' documentazione viva + un piccolo helper (tokenNonAgganciati) per
   // scoprire a runtime quali effetti un pet ha "silenti", utile in debug/scheda.
   //
-  // AGGIORNATO in questo batch (Gruppo A — Cibo/Allenamento/Energia): rimossi dalla lista
-  // bonus_cibo, blocca_cibo, bonus_allenamento, allenamenti_giorno, allenamento_extra,
-  // allenamento_durata, allenamento_energia, energia_decay, ignora_rifiuto_energia — ora
-  // agganciati (v. sezione "GRUPPO A" sopra). Restano da fare:
+  // AGGIORNATO in questo batch (Gruppo B — Missioni/Economia): rimossi dalla lista bonus_missione,
+  // ogni_missione, mancia, login, blocca_categoria, fallimento, bonus_missione_monete e il token
+  // libero "se fallimento_carattere: ..." (Bad Loser) — ora agganciati (v. sezione "GRUPPO B"
+  // sopra). perk_tag resta in lista ma con un HELPER STUB gia' pronto (perkTagAttivo, sempre
+  // false): aspetta i tag missione del batch missioni P2, v. nota dedicata sotto. Restano da fare:
   //
-  //   bonus_missione=...      -> bonus per categoria di missione (stat/durata)
-  //   ogni_missione=...       -> bonus fisso ad ogni missione completata, qualsiasi categoria
-  //   mancia=...              -> moltiplicatore sulle mance post-missione (es. x3)
-  //   login=...               -> bonus al login giornaliero (es. monete+10)
   //   furto=...                -> oggetto gratis giornaliero dal negozio (con o senza tetto)
   //   invenzione=...          -> Pool Inventore settimanale (salta allenamento, item casuale)
-  //   perk_tag=...            -> niente-fallimento + super garantito su un TAG di missione
-  //                              (non su una categoria: richiede i tag missione, non ancora
-  //                              esistenti — v. PROTOTIPO-2.md Blocco 3/Blocco 9)
-  //   blocca_categoria=...    -> esclude una categoria di missione dalla rosa
+  //   perk_tag=...            -> [STUB pronto, v. perkTagAttivo] niente-fallimento + super
+  //                              garantito su un TAG di missione (non su una categoria: richiede
+  //                              i tag missione, non ancora esistenti — v. PROTOTIPO-2.md Blocco
+  //                              3/Blocco 9. Talenti coinvolti: Amante della Natura, Inventore.
+  //                              NON aggiungere il campo tag al DSL missioni qui: lo fa il batch
+  //                              missioni; questo modulo si limita allo stub finche' non esiste)
   //   igiene_felicita=inverti -> relazione Igiene<->Felicita' invertita (Idrofobico)
   //   immune_malus_condizioni -> mai malus Salute dai malus condizioni (Anima Candida)
   //   notte=ferite=0          -> azzera le Ferite ogni notte (Anima Candida)
   //   infermeria_costo=...    -> sconto sul costo dell'infermeria
   //   infermeria_cura=...     -> cura extra dall'infermeria
   //   risveglio=...           -> effetto automatico ad ogni risveglio (es. ferite-10)
-  //   fallimento=...          -> annulla/modifica il malus di un fallimento missione
-  //   se <cond>: ...          -> condizioni testuali libere (es. "se fallimento_carattere: ...",
-  //                              "se igiene<50: ...") da interpretare caso per caso
   //   parole_giorno=...       -> aumenta il tetto di parole insegnabili al giorno
   //   uso_parola=...          -> probabilita' che il pet usi la parola imparata nelle battute
   //   nota=...                -> annotazioni testuali non meccaniche (es. "malus_salute_sporco_resta")
-  //   bonus_missione_monete=... -> moltiplicatore monete da missioni (Cleptomane/Boss di Quartiere)
-  //   missione_durata=...     -> moltiplicatore/offset sulla durata missione (Fulmine di Quartiere)
   //
   // Quando si implementa uno di questi in un batch futuro: aggiungere l'hook nel sistema
   // pertinente (missions.js/care.js/pet.js/dialog.js) SUL MODELLO di bonusStat/capCoccole sopra
   // (leggere talentiAttivi(state) -> trovaToken(...)) e rimuovere la voce da questa lista.
 
   var TOKEN_NON_AGGANCIATI = [
-    'bonus_missione', 'ogni_missione', 'mancia', 'login',
-    'furto', 'invenzione', 'perk_tag', 'blocca_categoria',
+    'furto', 'invenzione', 'perk_tag (stub pronto, attende tag missione P2)',
     'igiene_felicita', 'immune_malus_condizioni', 'notte',
-    'infermeria_costo', 'infermeria_cura', 'risveglio', 'fallimento', 'bonus_missione_monete',
-    'parole_giorno', 'uso_parola', 'nota', 'missione_durata'
+    'infermeria_costo', 'infermeria_cura', 'risveglio',
+    'parole_giorno', 'uso_parola', 'nota'
   ];
 
-  // Prefissi/token esatti ormai AGGANCIATI (passivo/cap_coccole dal batch precedente + il
-  // Gruppo A di questo batch): usati da tokenNonAgganciati sotto per non segnalarli come
+  // Prefissi/token esatti ormai AGGANCIATI (passivo/cap_coccole dal batch core + Gruppo A +
+  // Gruppo B di questo batch): usati da tokenNonAgganciati sotto per non segnalarli come
   // "silenti" nel debug/scheda, pur essendo ancora presenti come token grezzi in effetti[].
+  // perk_tag= resta escluso (e' un prefisso agganciato "a meta'": letto ma senza effetto finche'
+  // non esistono i tag missione), quindi NON e' nella lista qui sotto apposta, cosi'
+  // tokenNonAgganciati continua a segnalarlo come "silente" finche' non fa davvero qualcosa.
   var PREFISSI_AGGANCIATI = [
     'passivo=', 'cap_coccole=', 'bonus_cibo=', 'blocca_cibo=', 'bonus_allenamento=',
     'allenamenti_giorno=', 'allenamento_extra=', 'allenamento_durata=', 'allenamento_energia=',
-    'energia_decay='
+    'energia_decay=', 'bonus_missione=', 'ogni_missione=', 'mancia=', 'login=',
+    'blocca_categoria=', 'fallimento=', 'bonus_missione_monete=', 'missione_durata='
   ];
   var TOKEN_ESATTI_AGGANCIATI = ['ignora_rifiuto_energia'];
+
+  // Prefisso libero agganciato (non "chiave=valore" pulito, v. badLoserEffetto): riconosciuto a
+  // parte perche' PREFISSI_AGGANCIATI/TOKEN_ESATTI_AGGANCIATI sopra coprono solo i due formati
+  // regolari.
+  var PREFISSO_LIBERO_AGGANCIATO = 'se fallimento_carattere:';
 
   // Ritorna, per i talenti attivi del pet, la lista di token grezzi presenti nei loro `effetti`
   // che NON sono tra quelli agganciati sopra — utile per il debug/scheda per segnalare "questo
@@ -417,6 +628,7 @@ window.PETQ = window.PETQ || {};
         var t = (effetti[j] || '').trim();
         if (t === '') continue;
         if (TOKEN_ESATTI_AGGANCIATI.indexOf(t) !== -1) continue;
+        if (t.toLowerCase().indexOf(PREFISSO_LIBERO_AGGANCIATO) === 0) continue;
         var aggancio = false;
         for (var k = 0; k < PREFISSI_AGGANCIATI.length; k++) {
           if (t.indexOf(PREFISSI_AGGANCIATI[k]) === 0) { aggancio = true; break; }
@@ -446,6 +658,17 @@ window.PETQ = window.PETQ || {};
     allenamentoExtraStat: allenamentoExtraStat,
     energiaDecayMult: energiaDecayMult,
     ignoraRifiutoEnergia: ignoraRifiutoEnergia,
+    // Gruppo B (Missioni & Economia)
+    bonusOgniMissione: bonusOgniMissione,
+    bonusMissioneCategoria: bonusMissioneCategoria,
+    bonusMissioneMoneteMult: bonusMissioneMoneteMult,
+    manciaMult: manciaMult,
+    loginBonusMonete: loginBonusMonete,
+    missioneDurataDeltaH: missioneDurataDeltaH,
+    fallimentoFelBloccato: fallimentoFelBloccato,
+    badLoserEffetto: badLoserEffetto,
+    categoriaBloccata: categoriaBloccata,
+    perkTagAttivo: perkTagAttivo,
     _capCoccoleDefault: CAP_COCCOLE_DEFAULT,
     _allenamentiGiornoDefault: ALLENAMENTI_GIORNO_DEFAULT,
     _tokenNonAgganciatiRegistry: TOKEN_NON_AGGANCIATI,

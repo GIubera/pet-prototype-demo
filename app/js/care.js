@@ -376,6 +376,13 @@ window.PETQ = window.PETQ || {};
     var bil = bilanciamento();
     var bonus = (bil.economia && typeof bil.economia.login === 'number') ? bil.economia.login : 10;
 
+    // Talenti (PROTOTIPO 2, Blocco 9, Gruppo B, "login=monete+10", Cuore Magnetico): extra
+    // fisso sul login giornaliero, sommato al bonus base PRIMA di scrivere state.coins cosi'
+    // risulta in un unico incremento (nessun bisogno di tracciarlo separato per la UI, che
+    // legge solo il totale ritornato da questa funzione).
+    var extraLogin = (PETQ.talenti && PETQ.talenti.loginBonusMonete) ? PETQ.talenti.loginBonusMonete(state) : 0;
+    bonus += extraLogin;
+
     state.coins = (state.coins || 0) + bonus;
     state.lastLoginDay = oggi;
 

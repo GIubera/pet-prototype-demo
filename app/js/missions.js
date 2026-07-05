@@ -193,7 +193,15 @@ window.PETQ = window.PETQ || {};
   // meno di 3 giorni di gioco sono escluse, salvo riammissione delle piu' vecchie se il pool
   // scende sotto la dimensione della rosa.
   function rosaDelGiorno(state) {
-    var tutte = dataMissioni().filter(function (m) { return !m.fuoriRosa && m.id !== 'm0'; });
+    // Talenti (Gruppo B, blocca_categoria=<categoria>, Pacifista): le missioni della categoria
+    // bloccata sono escluse dalla rosa PRIMA del cooldown, cosi' non vengono mai ripescate
+    // nemmeno come riammissione "piu' vecchia" quando il pool scende sotto DIM_ROSA.
+    var bloccaCategoria = (PETQ.talenti && PETQ.talenti.categoriaBloccata) ? PETQ.talenti.categoriaBloccata : null;
+    var tutte = dataMissioni().filter(function (m) {
+      if (m.fuoriRosa || m.id === 'm0') return false;
+      if (bloccaCategoria && state && bloccaCategoria(state, m.categoria)) return false;
+      return true;
+    });
     var candidate = applicaCooldown(tutte, state);
     if (candidate.length === 0) {
       console.warn('PETQ.missions: nessuna scheda disponibile per la rosa del giorno');
@@ -316,6 +324,24 @@ window.PETQ = window.PETQ || {};
 
   // ---------- avvio / stato missione in corso ----------
 
+  // Durata effettiva di una missione dopo i talenti (Gruppo B, PROTOTIPO 2 Blocco 9):
+  // somma il delta globale (missione_durata=-1h, Fulmine di Quartiere) e quello di categoria
+  // (bonus_missione=<categoria>:...,durata-1h, Topo di Biblioteca) alla durata base della
+  // scheda, poi clampa a un minimo di 1 ora (durata mai a 0 o negativa: "min sensato" richiesto
+  // dal brief). Espone il dettaglio per i test (_durataMissioneEffettivaMs).
+  var DURATA_MISSIONE_MIN_MS = 3600000; // 1h
+
+  function durataMissioneEffettivaMs(state, scheda) {
+    var base = scheda.durataMs || 3600000;
+    var deltaOreGlobale = (PETQ.talenti && PETQ.talenti.missioneDurataDeltaH) ? PETQ.talenti.missioneDurataDeltaH(state) : 0;
+    var deltaOreCategoria = 0;
+    if (scheda.categoria && PETQ.talenti && PETQ.talenti.bonusMissioneCategoria) {
+      deltaOreCategoria = PETQ.talenti.bonusMissioneCategoria(state, scheda.categoria).durataDeltaH;
+    }
+    var effettiva = base + (deltaOreGlobale + deltaOreCategoria) * 3600000;
+    return Math.max(DURATA_MISSIONE_MIN_MS, effettiva);
+  }
+
   function avvia(state, id) {
     assicuraStatoMissioni(state);
     var scheda = trovaScheda(id);
@@ -347,11 +373,13 @@ window.PETQ = window.PETQ || {};
       return { ok: false, msg: 'Monete insufficienti.' };
     }
 
+    var durataEffettivaMs = durataMissioneEffettivaMs(state, scheda);
     state.coins -= costo;
     state.missione = {
       id: id,
-      fine: Date.now() + (scheda.durataMs || 3600000),
-      costo: costo // salvato qui cosi' risolvi() puo' applicare rimborsoCosto senza ripescare la scheda
+      fine: Date.now() + durataEffettivaMs,
+      costo: costo, // salvato qui cosi' risolvi() puo' applicare rimborsoCosto senza ripescare la scheda
+      durataEffettivaMs: durataEffettivaMs // salvata cosi' risolvi() calcola il costo Energia sulla durata REALE (post talenti), non quella base della scheda
     };
 
     return { ok: true, msg: (scheda.titolo || id) + ' avviata.' };
@@ -482,6 +510,22 @@ window.PETQ = window.PETQ || {};
     return superList[0] || null;
   }
 
+  // Talenti (Gruppo B, Bad Loser, "se fallimento_carattere: ..."): un fallimento e' "di
+  // carattere" quando la sua cond include una condizione di PERSONALITA' che coincide con
+  // quella del pet (es. "cond= maleducato & carisma<=0" per un pet maleducato) — cioe' il
+  // fallimento e' scattato (anche) per come e' fatto il pet, non solo per stat basse. Cerca
+  // ricorsivamente nell'albero condizione gia' pre-parsato (stessa forma di valutaCondizione).
+  function contieneCondPersonalita(nodo, personalita) {
+    if (!nodo || !personalita) return false;
+    if (nodo.op === 'personalita') return nodo.valore === personalita;
+    if (nodo.op === '&' || nodo.op === '|') {
+      for (var i = 0; i < nodo.figli.length; i++) {
+        if (contieneCondPersonalita(nodo.figli[i], personalita)) return true;
+      }
+    }
+    return false;
+  }
+
   // ---------- risoluzione + applicazione reward ----------
 
   function scenaIdPer(scheda, esito) {
@@ -503,14 +547,24 @@ window.PETQ = window.PETQ || {};
     return ARMI_M7_FALLBACK;
   }
 
-  function applicaRewardToken(state, token, rewardsOut) {
+  // opzioni = { moltNumerico, moltMonete } (Talenti Gruppo B, opzionale, default 1 entrambi):
+  // moltNumerico scala il DELTA GREZZO dei token stat/fel/igiene/ferite (Bad Loser, "reward=x2"
+  // sui fallimenti di carattere: raddoppia il numero scritto in scheda, qualunque sia il segno,
+  // cosi' un fallimento resta un fallimento ma il "premio di consolazione" pesa il doppio).
+  // moltMonete scala SOLO il token monete (bonus_missione_monete=x1.5, Cleptomane/Boss di
+  // Quartiere): se entrambi sono passati sul token monete, si applicano moltiplicati insieme
+  // (caso raro: nessun talento attuale li combina sullo stesso pet, ma il comportamento resta
+  // coerente se mai capitasse un fallimento_carattere che paga anche monete).
+  function applicaRewardToken(state, token, rewardsOut, opzioni) {
     var t = (token || '').trim();
     if (t === '') return;
+    var moltNumerico = (opzioni && typeof opzioni.moltNumerico === 'number') ? opzioni.moltNumerico : 1;
+    var moltMonete = (opzioni && typeof opzioni.moltMonete === 'number') ? opzioni.moltMonete : 1;
 
     var mStat = t.match(/^(forza|intelligenza|velocita|carisma)\s*([+-]\d+)$/i);
     if (mStat) {
       var stat = mStat[1].toLowerCase();
-      var delta = parseInt(mStat[2], 10);
+      var delta = Math.round(parseInt(mStat[2], 10) * moltNumerico);
       if (state.pet && state.pet.rpg && typeof state.pet.rpg[stat] === 'number') {
         state.pet.rpg[stat] += delta;
       }
@@ -520,7 +574,7 @@ window.PETQ = window.PETQ || {};
 
     var mFel = t.match(/^fel\s*([+-]\d+)$/i);
     if (mFel) {
-      var dFel = parseInt(mFel[1], 10);
+      var dFel = Math.round(parseInt(mFel[1], 10) * moltNumerico);
       if (state.pet) state.pet.stats.felicita = clamp(state.pet.stats.felicita + dFel, 0, 100);
       rewardsOut.push({ tipo: 'felicita', valore: dFel });
       return;
@@ -528,7 +582,7 @@ window.PETQ = window.PETQ || {};
 
     var mMonete = t.match(/^monete\s*([+-]\d+)$/i);
     if (mMonete) {
-      var dMonete = parseInt(mMonete[1], 10);
+      var dMonete = Math.round(parseInt(mMonete[1], 10) * moltNumerico * moltMonete);
       state.coins = (state.coins || 0) + dMonete;
       rewardsOut.push({ tipo: 'monete', valore: dMonete });
       return;
@@ -536,7 +590,7 @@ window.PETQ = window.PETQ || {};
 
     var mIgiene = t.match(/^igiene\s*([+-]\d+)$/i);
     if (mIgiene) {
-      var dIgiene = parseInt(mIgiene[1], 10);
+      var dIgiene = Math.round(parseInt(mIgiene[1], 10) * moltNumerico);
       // Ombrello meccanico piazzato: dimezza il calo Igiene nelle missioni a rischio
       // pioggia/sporco (bilanciamento.md/arredi.md: "-10 -> -5"). Nel prototipo l'unico
       // reward negativo di Igiene e' M5 (rischio pioggia): applichiamo il dimezzamento a
@@ -552,7 +606,7 @@ window.PETQ = window.PETQ || {};
 
     var mFerite = t.match(/^ferite\s*([+-]\d+)$/i);
     if (mFerite) {
-      var dFerite = parseInt(mFerite[1], 10);
+      var dFerite = Math.round(parseInt(mFerite[1], 10) * moltNumerico);
       state.ferite = clamp((state.ferite || 0) + dFerite, 0, 100);
       if (state.pet) PETQ.pet.recomputeSalute(state.pet, state);
       rewardsOut.push({ tipo: 'ferite', valore: dFerite });
@@ -634,6 +688,24 @@ window.PETQ = window.PETQ || {};
     console.warn('PETQ.missions: token reward non riconosciuto: "' + t + '"');
   }
 
+  // Mancia post-missione (GDD "Economia": "mance post-missione che scalano col carisma";
+  // bilanciamento.md "Mancia post-missione: 1 moneta ogni 5 punti di Carisma"): fonte di
+  // economia gia' prevista dal design ma MAI agganciata al motore missioni fino a questo
+  // batch (nessun reward token la generava). La aggiungiamo qui perche' il talento Cuore
+  // Magnetico (mancia=x3) ha bisogno di qualcosa su cui moltiplicare. Usa la stat Carisma
+  // EFFETTIVA (base + bonus passivi arredi/talenti, stesso principio di bonusStatCombinato)
+  // cosi' i bonus permanenti di Carisma alzano anche la mancia, coerente col resto del motore.
+  // Arrotondamento per difetto (Math.floor): niente monete frazionarie.
+  var MANCIA_CARISMA_PER_MONETA = 5;
+
+  function calcolaMancia(state, bonusStat) {
+    if (!state || !state.pet) return 0;
+    var carismaEffettivo = statEffettiva(state.pet, bonusStat, 'carisma');
+    var base = Math.floor(Math.max(0, carismaEffettivo) / MANCIA_CARISMA_PER_MONETA);
+    var mult = (PETQ.talenti && PETQ.talenti.manciaMult) ? PETQ.talenti.manciaMult(state) : 1;
+    return Math.round(base * mult);
+  }
+
   function risolvi(state) {
     assicuraStatoMissioni(state);
     if (!state.missione) {
@@ -659,21 +731,104 @@ window.PETQ = window.PETQ || {};
     }
 
     // Costo energia missione (GDD/bilanciamento.md "Energia e sonno"): 8 x ore di durata,
-    // clampato a 0 (mai sotto zero, mai reso "negativo" oltre il minimo della stat).
+    // clampato a 0 (mai sotto zero, mai reso "negativo" oltre il minimo della stat). Usa la
+    // durata EFFETTIVA (post talenti missione_durata/bonus_missione durata) gia' salvata
+    // sull'istanza di missione in corso, non la durata base della scheda: una missione
+    // accorciata dai talenti costa anche meno Energia, coerente col "meno tempo via".
     if (state.pet && state.pet.stats && PETQ.pet && PETQ.pet.bilEnergiaSonno) {
       var es = PETQ.pet.bilEnergiaSonno();
-      var oreDurata = (scheda.durataMs || 0) / 3600000;
+      var durataEffettivaMs = (state.missione && typeof state.missione.durataEffettivaMs === 'number') ? state.missione.durataEffettivaMs : (scheda.durataMs || 0);
+      var oreDurata = durataEffettivaMs / 3600000;
       var costoEnergia = es.costoMissionePerOra * oreDurata;
       state.pet.stats.energia = clamp((typeof state.pet.stats.energia === 'number' ? state.pet.stats.energia : 70) - costoEnergia, 0, 100);
     }
 
+    // Talenti (Gruppo B, Bad Loser): il fallimento e' "di carattere" se la sua cond include una
+    // condizione di personalita' che coincide con quella del pet (v. contieneCondPersonalita).
+    // Serve PRIMA di applicare i reward, perche' decide il moltiplicatore da passare al loop.
+    var personalita = state.pet ? state.pet.personalita : null;
+    var fallimentoDiCarattere = esito.tipo === 'fallimento' && contieneCondPersonalita(esito.cond, personalita);
+    var badLoser = (fallimentoDiCarattere && PETQ.talenti && PETQ.talenti.badLoserEffetto) ? PETQ.talenti.badLoserEffetto(state) : null;
+
+    // Talenti (Gruppo B, bonus_missione_monete=x1.5, Cleptomane/Boss di Quartiere): moltiplica
+    // SOLO il token monete del reward, su qualsiasi esito (super/standard/fallimento) che ne dia.
+    var moltMonete = (PETQ.talenti && PETQ.talenti.bonusMissioneMoneteMult) ? PETQ.talenti.bonusMissioneMoneteMult(state) : 1;
+
+    var opzioniReward = {
+      moltNumerico: badLoser ? badLoser.moltReward : 1,
+      moltMonete: moltMonete
+    };
+
     var rewards = [];
     for (var i = 0; i < (esito.reward || []).length; i++) {
       try {
-        applicaRewardToken(state, esito.reward[i], rewards);
+        applicaRewardToken(state, esito.reward[i], rewards, opzioniReward);
       } catch (e) {
         console.warn('PETQ.missions: errore applicando reward "' + esito.reward[i] + '"', e);
       }
+    }
+
+    // Talenti (Gruppo B, Bad Loser): -10 Felicita' EXTRA sui fallimenti di carattere, oltre
+    // all'eventuale fel- gia' nel reward. Applicato qui (non nel loop sopra) perche' non e' un
+    // token della scheda ma un effetto aggiuntivo del talento.
+    if (badLoser && badLoser.felExtra && state.pet) {
+      state.pet.stats.felicita = clamp(state.pet.stats.felicita + badLoser.felExtra, 0, 100);
+      rewards.push({ tipo: 'felicita', valore: badLoser.felExtra, talento: 'Bad Loser' });
+    }
+
+    // Talenti (Gruppo B, Faccia di Bronzo, "fallimento=fel-0"): annulla QUALSIASI perdita di
+    // Felicita' accumulata dal fallimento in questa risoluzione (sia il fel- della scheda sia
+    // l'extra di Bad Loser sopra: combo voluta esplicitamente dal design). Applicato per ultimo,
+    // sommando indietro l'ammontare netto negativo registrato nei rewards di tipo 'felicita'.
+    if (esito.tipo === 'fallimento' && PETQ.talenti && PETQ.talenti.fallimentoFelBloccato && PETQ.talenti.fallimentoFelBloccato(state)) {
+      var feliceDaAnnullare = 0;
+      for (var k = 0; k < rewards.length; k++) {
+        if (rewards[k].tipo === 'felicita' && rewards[k].valore < 0) feliceDaAnnullare += rewards[k].valore;
+      }
+      if (feliceDaAnnullare < 0 && state.pet) {
+        state.pet.stats.felicita = clamp(state.pet.stats.felicita - feliceDaAnnullare, 0, 100); // sottrae un negativo = somma
+        rewards.push({ tipo: 'felicita', valore: -feliceDaAnnullare, talento: 'Faccia di Bronzo' });
+      }
+    }
+
+    // Talenti (Gruppo B, ogni_missione=<stat|monete>+N, Spirito Agonistico/Mani Lestre/Cuore
+    // Magnetico): bonus fisso ad OGNI missione completata (qualsiasi esito, incluso fallimento:
+    // il brief lo richiede esplicito - "qualsiasi esito non-null"), su stat RPG e/o monete.
+    if (PETQ.talenti && PETQ.talenti.bonusOgniMissione) {
+      var ogniMissione = PETQ.talenti.bonusOgniMissione(state);
+      for (var s = 0; s < STAT_NOMI.length; s++) {
+        var statNome = STAT_NOMI[s];
+        if (ogniMissione[statNome] && state.pet && state.pet.rpg) {
+          state.pet.rpg[statNome] += ogniMissione[statNome];
+          rewards.push({ tipo: 'stat', stat: statNome, valore: ogniMissione[statNome], talento: 'ogni_missione' });
+        }
+      }
+      if (ogniMissione.monete) {
+        state.coins = (state.coins || 0) + ogniMissione.monete;
+        rewards.push({ tipo: 'monete', valore: ogniMissione.monete, talento: 'ogni_missione' });
+      }
+    }
+
+    // Talenti (Gruppo B, bonus_missione=<categoria>:<stat>+N, Topo di Biblioteca/Pacifista):
+    // bonus stat extra SOLO se la missione e' della categoria giusta (la parte durata e' gia'
+    // stata applicata all'avvio, v. durataMissioneEffettivaMs).
+    if (scheda.categoria && PETQ.talenti && PETQ.talenti.bonusMissioneCategoria) {
+      var catBonus = PETQ.talenti.bonusMissioneCategoria(state, scheda.categoria).statExtra;
+      for (var c = 0; c < STAT_NOMI.length; c++) {
+        var sn = STAT_NOMI[c];
+        if (catBonus[sn] && state.pet && state.pet.rpg) {
+          state.pet.rpg[sn] += catBonus[sn];
+          rewards.push({ tipo: 'stat', stat: sn, valore: catBonus[sn], talento: 'bonus_missione' });
+        }
+      }
+    }
+
+    // Mancia post-missione (v. calcolaMancia sopra): su OGNI missione risolta con esito valido
+    // (super/standard/fallimento), scala col Carisma effettivo e coi talenti (mancia=x3).
+    var mancia = calcolaMancia(state, bonusStat);
+    if (mancia > 0) {
+      state.coins = (state.coins || 0) + mancia;
+      rewards.push({ tipo: 'monete', valore: mancia, talento: 'mancia' });
     }
 
     var risultato = {
@@ -721,7 +876,13 @@ window.PETQ = window.PETQ || {};
     _applicaCooldown: applicaCooldown,
     _diffGiorniStr: diffGiorniStr,
     _dimRosa: DIM_ROSA,
-    _cooldownGiorni: COOLDOWN_GIORNI
+    _cooldownGiorni: COOLDOWN_GIORNI,
+    // Talenti Gruppo B (esposti per i test + eventuali chiamanti UI futuri)
+    _durataMissioneEffettivaMs: durataMissioneEffettivaMs,
+    _contieneCondPersonalita: contieneCondPersonalita,
+    _calcolaMancia: calcolaMancia,
+    _applicaRewardToken: applicaRewardToken,
+    _manciaCarismaPerMoneta: MANCIA_CARISMA_PER_MONETA
   };
 
 })();
