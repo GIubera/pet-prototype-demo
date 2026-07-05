@@ -50,7 +50,11 @@ Voce: energia infinita, tutto è un allenamento o una gara, motivational coach a
 - Ho esultato togliendomi la maglietta. Ammonizione giustissima, rifarei tutto.
 
 ## Coccole finite
-- [ESEMPIO] Pausa recupero, coach: le coccole di oggi sono da bollettino esaurito. Poi si ricarica, promesso.
+- Pausa recupero, coach: le coccole di oggi sono da bollettino esaurito. Poi si ricarica, promesso.
+- Stop, coach! Anche l'affetto va dosato: sovrallenamento di coccole = strappo alla felicità.
+- Cinque serie di coccole: allenamento completo! Ora recupero muscolare, domani si raddoppia. (Non si può. Peccato.)
+- Alt! Zona rossa di affetto raggiunta. Il preparatore dice stop. Domani sessione doppia? Domani sessione doppia.
+- Le coccole vanno periodizzate, coach: oggi carico completato. Vai a riposare anche tu, che domani si spinge.
 
 ## Trascurato / triste
 - Tre giorni senza allenamento di coppia. La panchina fa male, {utente}. E io non sono da panchina.

@@ -49,7 +49,10 @@ Voce: dolce, premuroso, un filo appiccicoso. Si scusa anche quando non serve.
 - Il mio cuore oggi fa le fusa. Non so se posso farle, ma le fa.
 
 ## Coccole finite
-- [ESEMPIO] Basta coccole per oggi, scusa... mi si scioglie il cuoricino se esagero. Domani si ricomincia?
+- Basta coccole per oggi, scusa... mi si scioglie il cuoricino se esagero. Domani si ricomincia?
+- Basta, basta... cioè non basta MAI, però se continui divento tutto rosso e poi non passa.
+- Ho finito lo spazio per le coccole di oggi! Le sto già riguardando tutte col pensiero, comunque.
+- Per oggi basta, scusa scusa scusa... è che voglio arrivare a domani con la voglia di ricominciare.
 
 ## Trascurato / triste
 - Non ti preoccupare per me... starò qui. Da solo. Va bene così.

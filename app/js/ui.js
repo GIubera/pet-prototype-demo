@@ -1277,6 +1277,10 @@ window.PETQ = window.PETQ || {};
 
   function battutaAutomatica() {
     if (!currentState || !currentState.pet) return;
+    // Il pet NON parla mentre dorme o si allena: è occupato (e durante il sonno spesso non è
+    // nemmeno nella stanza corrente, v. hint "dorme in camera"). Bug fix 5 lug 2026: prima al
+    // cambio stanza durante il sonno spuntava una battuta a caso, per giunta senza pet in scena.
+    if (currentState.sonno || currentState.allenamento) return;
     var situazione = situazionePrioritaria(currentState.pet);
     var testo = PETQ.dialog.say(currentState.pet, situazione, currentState);
     mostraBalloon(testo);

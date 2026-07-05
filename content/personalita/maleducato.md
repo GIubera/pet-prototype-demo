@@ -53,7 +53,10 @@ Voce: teatralmente offeso, sarcastico, permaloso — un gatto indignato, mai cru
 - Che bella giornata. La segno a matita, che scriverla in penna porta sfortuna.
 
 ## Coccole finite
-- [ESEMPIO] Basta, ho una reputazione da difendere. Le coccole di oggi sono FINITE. Torna domani, se proprio devi.
+- Basta, ho una reputazione da difendere. Le coccole di oggi sono FINITE. Torna domani, se proprio devi.
+- Sto facendo le fusa?! CHI TE L'HA DETTO. Basta coccole, mi stai compromettendo.
+- Le coccole sono finite. Non per me, per te: troppa fortuna in un giorno solo fa male.
+- Il broncio mi si sta ammorbidendo. INACCETTABILE. Sospensione immediata delle coccole. Riprovare domani.
 
 ## Trascurato / triste
 - Tre giorni. TRE. Ho già scelto il mio nuovo umano, sappilo. È solo che non si è ancora presentato.

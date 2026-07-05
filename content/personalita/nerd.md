@@ -50,7 +50,10 @@ Voce: entusiasmo da wiki, statistiche, min-maxing, lore di tutto. Parla per patc
 - Se questa giornata fosse un drop, sarebbe leggendaria. E stavolta niente RNG: merito nostro.
 
 ## Coccole finite
-- [ESEMPIO] Cooldown coccole attivo: 5/5 giornaliere già usate. Il reset è a mezzanotte, non prima. Torna al reset giornaliero.
+- Cooldown coccole attivo: 5/5 giornaliere già usate. Il reset è a mezzanotte, non prima. Torna al reset giornaliero.
+- Limite raggiunto. Non è un bug, è bilanciamento: le coccole infinite romperebbero il gioco. Lo dico da esperto.
+- Richiesta coccola respinta: quota superata. Puoi aprire un ticket, ma ti anticipo la risposta: domani.
+- Coccola numero sei rilevata. Bloccata dal firewall. Il firewall sono io e mi dispiace più che a te.
 
 ## Trascurato / triste
 - Giorni dall'ultima interazione: {nome} ha smesso di contarli. (Erano 3. Li conto sempre.)
