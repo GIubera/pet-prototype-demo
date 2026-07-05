@@ -775,21 +775,15 @@ window.PETQ = window.PETQ || {};
   // Overlay "sta dormendo altrove": la stanza corrente (non camera) resta vuota mentre il
   // pet dorme, con un avviso discreto invece del pet sul pavimento (GDD "Energia e sonno").
   function disegnaHintDorme(g, state) {
-    var nome = (state.pet && state.pet.nome) || 'Il pet';
-    var testo = nome + ' sta dormendo in camera 💤';
+    // Indicatore DISCRETO: solo un piccolo 💤 nell'angolo in alto a destra della stanza.
+    // Il messaggio completo ("sta dormendo in camera...") resta nella riga .petq-hint SOTTO
+    // il canvas (v. renderAzioni*), qui niente box/testo grande che copre i mobili.
     g.save();
-    g.font = '6px monospace';
-    g.textBaseline = 'middle';
-    var textW = g.measureText(testo).width;
-    var padX = 5, padY = 4;
-    var boxW = Math.min(ROOM_W - 6, textW + padX * 2);
-    var boxX = Math.round((ROOM_W - boxW) / 2);
-    var boxY = Math.round(ROOM_H / 2 - 7);
-    g.fillStyle = 'rgba(13, 18, 24, 0.78)';
-    g.fillRect(boxX, boxY, boxW, 14);
-    g.fillStyle = '#dfe4ec';
-    g.textAlign = 'center';
-    g.fillText(testo, ROOM_W / 2, boxY + padY + 3, boxW - padX);
+    g.globalAlpha = 0.8;
+    g.font = '8px sans-serif';
+    g.textAlign = 'right';
+    g.textBaseline = 'top';
+    g.fillText('💤', ROOM_W - 3, 3);
     g.restore();
   }
 
