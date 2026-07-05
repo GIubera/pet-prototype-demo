@@ -13,16 +13,33 @@ Il codice legge QUESTO file: cambiare un numero qui cambia il gioco. Le sezioni 
 
 Ritmo cura target (playtest v2, 4 lug 2026, su ~14 ore attive): **2 pasti, almeno 2 lavaggi, almeno 3 pulizie bisogni al giorno**. Bisogni legati alla digestione: 60-90 minuti di gioco dopo OGNI pasto lo spawn è quasi garantito (p 0.9), più un baseline casuale ridotto (0.05/ora). I numeri della digestione vivono nel codice (pet.js applyDecay / care.js feed), qui la regola.
 
+## Evoluzione (PROTOTIPO 2, punto 1 — design vincolante da PROTOTIPO-2.md)
+
+| Cosa | Valore |
+|---|---|
+| Baby → Teen | 5 giorni DI GIOCO (pet.giorniVita, avanza a ogni "nuovo giorno": login reale o debug "Nuovo giorno") |
+| Teen → Adulto | P3, NON in questo prototipo (10 giorni, da GDD — non implementato) |
+| Effetto sulle statistiche | NESSUNO per ora — solo stadio + aspetto (bodyVariant vede 'teen') + battuta pool `evoluzione`. TODO commentato in pet.js `controllaEvoluzione`: il fondatore deciderà se aggiungere un bonus (es. +1 RPG) |
+
 ## Soglie
 
 | Cosa | Valore |
 |---|---|
 | Stat "critica" (sprite triste, notifiche) | < 25 |
 | Variante magra | media Fame ultimi 2 giorni < 30 |
-| Variante ciccione | >5 pasti/giorno per 2 giorni o >3 dolci/giorno o ≥2 sovralimentazioni recenti |
 | Overlay sporco | Igiene < 30 |
 | Malus missione da Salute | Salute < 40 → sprite sofferente + avviso prima di partire in missione |
 | Soglia sovralimentazione | Fame ≥ 90 al momento del pasto (solo teen+: dare da mangiare con la pancia già piena fa ingrassare e +10 Ferite; il baby non ne risente) |
+
+### Variante ciccione — soglie PER STADIO (PROTOTIPO 2, punto 1)
+
+La variante esiste negli sprite da prima ma non appariva mai in P1 (regola "mai baby", e il pet era sempre baby). Col teen diventa raggiungibile: decisione fondatore, **difficile da teen**, **più facile da adulto** (P3, soglie ancora da tarare quando arriva lo stadio — struttura già pronta in codice, `pet.js` `SOGLIE_CICCIONE_PER_STADIO`).
+
+| Stadio | Soglia (basta UNA condizione, come prima) |
+|---|---|
+| Baby | mai ciccione (nessuna soglia — il cucciolo non ingrassa così, GDD "Aspetto dinamico") |
+| Teen | >8 pasti/giorno **o** >6 dolci/giorno **o** ≥4 sovralimentazioni recenti cumulative (era >5 pasti/>3 dolci/≥2 sovralimentazioni nel valore unico pre-evoluzione: alzate apposta per renderlo difficile da teen) |
+| Adulto (P3) | da tarare — soglia più bassa delle altre, così l'eccesso da adulto è più facile che da teen |
 
 ## Sistema Salute (v1 — sostituisce la vecchia media pesata)
 

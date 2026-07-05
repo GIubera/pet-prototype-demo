@@ -227,6 +227,9 @@ window.PETQ = window.PETQ || {};
       controllaAllenamentoScaduto();
       // apertura app con missione già finita: risolvi e mostra subito l'esito
       if (controllaMissioneScaduta()) return;
+      // evoluzione baby->teen maturata offline (es. tanti "giorni" passati mentre l'app era
+      // chiusa): prende il controllo e mostra la schermata dedicata prima della casa.
+      if (controllaEvoluzioneScaduta()) return;
       mostraCasa(state);
     } else {
       mostraIntro();
@@ -240,6 +243,7 @@ window.PETQ = window.PETQ || {};
     controllaSonnoScaduto();
     controllaAllenamentoScaduto();
     if (!animazioneInCorso && controllaMissioneScaduta()) return;
+    if (!animazioneInCorso && controllaEvoluzioneScaduta()) return;
     if (document.getElementById('petq-casa')) {
       aggiornaHud(state);
       disegnaStanzaEPet(state);
@@ -2711,6 +2715,86 @@ window.PETQ = window.PETQ || {};
     montaDebugPanel();
   }
 
+  // ==================== SCHERMATA EVOLUZIONE (PROTOTIPO-2.md punto 1) ====================
+  // Baby -> teen: mostra il pet baby, un "flash" di transizione, poi il pet teen (riusa gli
+  // sprite esistenti, v. sprites.js) con la battuta del pool 'evoluzione' della personalita' e
+  // un bottone "Continua" che torna alla casa col pet gia' teen (lo stadio e' stato cambiato
+  // PRIMA di aprire questa schermata, v. controllaEvoluzioneScaduta sotto: qui disegniamo solo
+  // "prima" costruendo un petLike temporaneo con stadio forzato a 'baby').
+  var EVOLUZIONE_FLASH_MS = 900;
+
+  function mostraEvoluzione(state) {
+    fermaIdle();
+    puliziaEffetto();
+    currentState = state;
+
+    var app = getApp();
+    app.innerHTML = '';
+
+    var wrap = el('div', 'petq-screen petq-evoluzione');
+    wrap.appendChild(el('h1', 'petq-title', 'Evoluzione!'));
+
+    var cart = document.createElement('canvas');
+    cart.width = ROOM_W;
+    cart.height = ROOM_H;
+    cart.className = 'petq-cartolina';
+    wrap.appendChild(cart);
+
+    var hint = el('div', 'petq-hint', (state.pet.nome || 'Il tuo pet') + ' e’ diventato TEEN.');
+    wrap.appendChild(hint);
+
+    var testoEl = el('p', 'petq-esito-testo', '');
+    wrap.appendChild(testoEl);
+
+    var btn = el('button', 'petq-btn petq-btn-primario', 'Continua');
+    btn.style.display = 'none';
+    btn.addEventListener('click', function () {
+      mostraCasa(currentState);
+    });
+    wrap.appendChild(btn);
+
+    app.appendChild(wrap);
+    montaDebugPanel();
+
+    // "prima": pet ancora baby (petLikeDaState legge lo stadio VERO, gia' 'teen' a questo
+    // punto perche' il cambio stadio e' avvenuto prima di chiamare questa funzione — v.
+    // controllaEvoluzioneScaduta — quindi forziamo qui un petLike copia con stadio 'baby').
+    var petLikeBaby = petLikeDaState(state);
+    petLikeBaby.stadio = 'baby';
+    petLikeBaby.corpo = 'normale'; // mai varianti corpo da baby (v. pet.bodyVariant)
+    PETQ.sprites.draw(cart, petLikeBaby, { frame: 0 });
+
+    // flash -> pet teen (scadenza garantita: setTimeout del browser, la schermata e' statica
+    // nel frattempo, nessun tick di gioco puo' "congelarla" a meta').
+    setTimeout(function () {
+      // flash: schermo bianco brevissimo
+      var g = cart.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, ROOM_W, ROOM_H);
+
+      setTimeout(function () {
+        PETQ.sprites.draw(cart, petLikeDaState(currentState), { frame: 0 });
+        testoEl.textContent = PETQ.dialog.say(currentState.pet, 'evoluzione', currentState);
+        btn.style.display = '';
+      }, 250);
+    }, EVOLUZIONE_FLASH_MS);
+  }
+
+  // Controlla se il pet deve evolvere (baby->teen, GDD/PROTOTIPO-2.md punto 1): chiamata da
+  // boot/render come controllaSonnoScaduto/controllaAllenamentoScaduto (stesso pattern
+  // idempotente). Se scatta, cambia stadio E prende il controllo mostrando la schermata
+  // dedicata (ritorna true, cosi' i chiamanti sanno di non proseguire col rendering normale).
+  function controllaEvoluzioneScaduta() {
+    if (!currentState || !currentState.pet || !PETQ.pet || !PETQ.pet.controllaEvoluzione) return false;
+    if (currentState.missione || currentState.sonno || currentState.allenamento) return false;
+    var evoluto = PETQ.pet.controllaEvoluzione(currentState.pet);
+    if (!evoluto) return false;
+    PETQ.save.save(currentState);
+    mostraEvoluzione(currentState);
+    return true;
+  }
+
   // slot nei testi esito: {oggetto} = il primo arredo/arma dei reward (tutorial M0), {nome} = pet
   function risolviSlotEsito(testo, esito) {
     if (!testo) return '';
@@ -2952,6 +3036,11 @@ window.PETQ = window.PETQ || {};
       retrodataCooldownMissioni(currentState, 1);
       if (PETQ.care && PETQ.care.dailyLogin) PETQ.care.dailyLogin(currentState);
       PETQ.save.save(currentState);
+      // evoluzione baby->teen (PROTOTIPO-2.md punto 1): giorniVita e' appena avanzato dal
+      // dailyLogin sopra, controlliamo subito se ha raggiunto la soglia (5x "Nuovo giorno" la
+      // fa scattare senza dover aspettare altri render). Se scatta prende il controllo dello
+      // schermo, quindi aggiornaHud/renderAzioni sotto diventano no-op sugli elementi rimossi.
+      if (controllaEvoluzioneScaduta()) return;
       aggiornaHud(currentState);
       renderAzioni();
       mostraToast('Nuovo giorno simulato.');
@@ -3022,6 +3111,23 @@ window.PETQ = window.PETQ || {};
       mostraToast('Parola di test inserita: banana.');
     });
     panel.appendChild(parolaTestBtn);
+
+    // Debug "Evolvi ora" (PROTOTIPO-2.md punto 1): forza pet.giorniVita alla soglia di
+    // evoluzione e la fa scattare subito, senza aspettare 5 "Nuovo giorno". Se il pet e' gia'
+    // teen non fa nulla (nessuna evoluzione ulteriore nel prototipo, v. GDD "Scope guard").
+    var evolviBtn = el('button', 'petq-btn petq-btn-mini', 'Evolvi ora');
+    evolviBtn.addEventListener('click', function () {
+      if (!currentState || !currentState.pet || !PETQ.pet) return;
+      if (currentState.pet.stadio !== 'baby') {
+        mostraToast('Non e\' più baby, niente da evolvere nel prototipo.');
+        return;
+      }
+      var soglia = (typeof PETQ.pet._giorniEvoluzioneTeen === 'number') ? PETQ.pet._giorniEvoluzioneTeen : 5;
+      currentState.pet.giorniVita = soglia;
+      PETQ.save.save(currentState);
+      controllaEvoluzioneScaduta();
+    });
+    panel.appendChild(evolviBtn);
 
     var resetBtn = el('button', 'petq-btn petq-btn-mini petq-btn-danger', 'Reset save');
     resetBtn.addEventListener('click', function () {

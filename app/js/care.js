@@ -266,6 +266,15 @@ window.PETQ = window.PETQ || {};
     if (state.pet) {
       state.pet.pastiIeri = state.pet.pastiOggi || [];
       state.pet.pastiOggi = [];
+
+      // Evoluzione baby->teen (PROTOTIPO-2.md punto 1): giorniVita avanza qui, ad ogni "nuovo
+      // giorno" di gioco (sia il login reale che il debug "Nuovo giorno" passano da qui, v.
+      // ui.js). Il cambio di stadio effettivo lo decide pet.controllaEvoluzione (chiamata dal
+      // tick/boot in ui.js, stesso pattern di controllaSveglia/controllaCrolloAutomatico) cosi'
+      // la UI puo' intercettarlo e mostrare la schermata dedicata invece di farlo scattare
+      // silenziosamente qui dentro dailyLogin.
+      if (typeof state.pet.giorniVita !== 'number') state.pet.giorniVita = 0;
+      state.pet.giorniVita += 1;
     }
 
     // nuovo giorno: azzera i contatori giornalieri del pacing cibo/cure, guarigione naturale ferite

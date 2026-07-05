@@ -9,6 +9,7 @@ window.PETQ = window.PETQ || {};
     { match: 'valigia', chiave: 'valigia' },
     { match: 'rientro', chiave: 'rientro' },
     { match: 'addio', chiave: 'addio' },
+    { match: 'evoluzione', chiave: 'evoluzione' },
     { match: 'saluto', chiave: 'saluto' },
     { match: 'ha fame', chiave: 'fame' },
     { match: 'sporco', chiave: 'sporco' },
@@ -28,7 +29,7 @@ window.PETQ = window.PETQ || {};
 
   var SEZIONE_CHIAVI = ['saluto', 'fame', 'sporco', 'felice', 'coccole_finite', 'triste',
     'missione_partenza', 'missione_successo', 'missione_fallimento', 'notifica', 'parola',
-    'valigia', 'notifica_valigia', 'rientro', 'addio',
+    'valigia', 'notifica_valigia', 'rientro', 'addio', 'evoluzione',
     'sonno', 'dormire', 'sveglia', 'dormito_male'];
 
   var DEFAULT_BILANCIAMENTO = {

@@ -108,7 +108,12 @@ window.PETQ = window.PETQ || {};
       rpg: rpg,
       pastiOggi: [],
       pastiIeri: [],
-      nascita: Date.now()
+      nascita: Date.now(),
+      // Evoluzione baby->teen (PROTOTIPO 2, GDD "Ciclo di vita"/PROTOTIPO-2.md punto 1):
+      // giorniVita conta i giorni DI GIOCO vissuti (incrementato ad ogni "nuovo giorno", v.
+      // care.dailyLogin), non i giorni di calendario reale — cosi' il debug "Nuovo giorno" lo
+      // fa avanzare ed e' testabile senza aspettare la mezzanotte vera.
+      giorniVita: 0
     };
 
     return pet;
@@ -312,15 +317,23 @@ window.PETQ = window.PETQ || {};
     state.ferite = clamp(state.ferite - 5, 0, 100);
   }
 
-  // Soglia sovralimentazioni recenti che attiva la variante ciccione (bilanciamento.md
-  // "Soglie" -> "Variante ciccione", aggiunta fondatore): 2 pasti dati a Fame gia' >= 90
-  // contano quanto ">5 pasti/giorno" o ">3 dolci/giorno". Il contatore e' incrementato da
-  // care.feed (pet.sovralimentazioniRecenti) e non viene mai azzerato nel prototipo (e' un
-  // segnale cumulativo "quante volte hai strafatto", non un contatore giornaliero).
-  var SOGLIA_SOVRALIMENTAZIONI_CICCIONE = 2;
+  // Soglie ciccione PER STADIO (bilanciamento.md "Soglie" -> "Variante ciccione", PROTOTIPO 2
+  // punto 1: il ciccione esisteva gia' negli sprite ma non appariva mai perche' in P1 il pet
+  // era sempre baby, e la regola era "mai baby"). Ora che il teen esiste diventa raggiungibile,
+  // ma DEVE essere difficile da teen (decisione fondatore) e piu' facile da adulto (P3, non
+  // implementato qui: struttura pronta, manca solo la voce 'adulto' quando arrivera' lo stadio).
+  // baby: 'mai' (nessuna soglia rende ciccione un baby, coerente col GDD "aspetto dinamico").
+  var SOGLIE_CICCIONE_PER_STADIO = {
+    teen: {
+      pastiGiornoSoglia: 8,           // >8 pasti/giorno (era >5 nel vecchio valore unico)
+      dolciGiornoSoglia: 6,           // >6 dolci/giorno (era >3)
+      sovralimentazioniSoglia: 4      // >=4 sovralimentazioni recenti cumulative (era >=2)
+    }
+    // adulto: P3 — soglie piu' basse (piu' facile), da tarare quando arriva lo stadio adulto.
+  };
 
-  // regole soglie da config: media fame bassa -> magro; >5 pasti/giorno, >3 dolci o
-  // sovralimentazioni ripetute -> ciccione
+  // regole soglie da config: media fame bassa -> magro; ciccione per-stadio (mai da baby,
+  // difficile da teen, v. SOGLIE_CICCIONE_PER_STADIO sopra).
   function bodyVariant(pet) {
     if (!pet) return 'normale';
     var bil = bilanciamento();
@@ -334,8 +347,13 @@ window.PETQ = window.PETQ || {};
       if (pastiOggi[i] && pastiOggi[i].categoria === 'dolce') dolciOggi++;
     }
 
-    if (pastiOggi.length > 5 || dolciOggi > 3 ||
-        (pet.sovralimentazioniRecenti || 0) >= SOGLIA_SOVRALIMENTAZIONI_CICCIONE) {
+    // Mai ciccione da baby (GDD "Aspetto dinamico": "NON da baby, il cucciolo non ingrassa
+    // così"): la variante ciccione esiste solo dallo stadio teen in su.
+    var soglieCiccione = pet.stadio && SOGLIE_CICCIONE_PER_STADIO[pet.stadio];
+    if (soglieCiccione &&
+        (pastiOggi.length > soglieCiccione.pastiGiornoSoglia ||
+         dolciOggi > soglieCiccione.dolciGiornoSoglia ||
+         (pet.sovralimentazioniRecenti || 0) >= soglieCiccione.sovralimentazioniSoglia)) {
       return 'ciccione';
     }
 
@@ -344,6 +362,35 @@ window.PETQ = window.PETQ || {};
     if (mediaFame < soglieMagro) return 'magro';
 
     return 'normale';
+  }
+
+  // ==================== Evoluzione baby->teen (PROTOTIPO 2, punto 1) ====================
+  // Trigger (docs/PROTOTIPO-2.md "SCOPE P2 CORRETTO" punto 1, design vincolante): baby dura 5
+  // giorni DI GIOCO -> diventa teen. I "giorni di gioco" sono pet.giorniVita, incrementato in
+  // care.dailyLogin ad ogni "nuovo giorno" (login giornaliero reale O debug "Nuovo giorno":
+  // stesso aggancio, cosi' il fondatore puo' testare senza aspettare 5 giorni di calendario).
+  // [teen->adulto (10 giorni) = P3, NON qui.]
+  var GIORNI_EVOLUZIONE_TEEN = 5;
+
+  // Controlla se il pet deve evolvere (baby -> teen). Ritorna true e MUTA pet.stadio se la
+  // condizione e' soddisfatta, altrimenti false e non tocca nulla. Va richiamata dopo ogni
+  // avanzamento di giorniVita (v. care.dailyLogin) e dal tick/boot (stesso pattern idempotente
+  // di controllaSveglia/controllaCrolloAutomatico sopra), cosi' la UI puo' intercettarla e
+  // mostrare la schermata dedicata (v. ui.js controllaEvoluzioneScaduta).
+  //
+  // TODO (da decidere col fondatore): l'evoluzione oggi NON modifica le statistiche (benessere
+  // né RPG) — solo stadio + aspetto (bodyVariant ora vede 'teen') + battuta. Se in futuro si
+  // vuole un bonus/malus all'evoluzione (es. +1 RPG, reset piccolo benessere, ecc.) va applicato
+  // QUI, subito dopo il cambio stadio, con una sezione dedicata in bilanciamento.md.
+  function controllaEvoluzione(pet) {
+    if (!pet || pet.stadio !== 'baby') return false;
+    var giorni = (typeof pet.giorniVita === 'number') ? pet.giorniVita : 0;
+    if (giorni < GIORNI_EVOLUZIONE_TEEN) return false;
+
+    pet.stadio = 'teen';
+    // TODO stat evoluzione: nessuna modifica a pet.stats/pet.rpg per ora (solo stadio+aspetto
+    // +battuta, v. commento sopra). Lasciato volutamente senza codice fino a decisione fondatore.
+    return true;
   }
 
   // ==================== Energia e sonno (GDD "Energia e sonno") ====================
@@ -530,7 +577,10 @@ window.PETQ = window.PETQ || {};
     puoSvegliare: puoSvegliare,
     debugSaltaAlMattino: debugSaltaAlMattino,
     controllaAllenamentoScaduto: controllaAllenamentoScaduto,
-    _risolviRisveglio: risolviRisveglio
+    controllaEvoluzione: controllaEvoluzione,
+    _risolviRisveglio: risolviRisveglio,
+    _giorniEvoluzioneTeen: GIORNI_EVOLUZIONE_TEEN,
+    _soglieCiccionePerStadio: SOGLIE_CICCIONE_PER_STADIO
   };
 
 })();
